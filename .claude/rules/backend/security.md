@@ -53,6 +53,6 @@ The specification may require another mechanism: refresh tokens, a forced change
 
 ## Verification
 - Unit tests: `PasswordPolicy` with a table of accepted and rejected passwords written as literals; the login service for an unknown login, a wrong password, a deactivated employee with the right password, and success; `matches` is true for the right password and false for a wrong one, a hash value is never asserted.
-- Integration tests (Testcontainers): login sets a cookie with `HttpOnly`, `SameSite=Strict` and `Max-Age=43200`; a request with that cookie works; an expired or tampered token gives 401; the same token gives 401 after the employee is deactivated; logout clears the cookie; `/api/v1/**` without a cookie gives 401; `/v3/api-docs` is open.
+- Integration tests (H2): login sets a cookie with `HttpOnly`, `SameSite=Strict` and `Max-Age=43200`; a request with that cookie works; an expired or tampered token gives 401; the same token gives 401 after the employee is deactivated; logout clears the cookie; `/api/v1/**` without a cookie gives 401; `/v3/api-docs` is open.
 - ArchUnit: only `..auth.security..` depends on `org.springframework.security..`; `PasswordPolicy` has no dependencies.
 - Reviewer checklist: no item from Prohibitions; every service that needs a right calls `CurrentUser`.

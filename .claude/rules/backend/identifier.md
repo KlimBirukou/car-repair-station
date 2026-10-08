@@ -13,7 +13,7 @@ Unless explicitly overridden by the project specification, use these rules for e
 - **How:** Inject `org.springframework.util.IdGenerator` and call `generateId()`.
 - **Update:** Entity IDs are immutable and must never be changed. The JPA entity has no setter for `id` and the column is `updatable = false`.
 - **Create DTOs:** Must not contain an `id` field.
-- **Database:** The primary key column uses the native UUID type (PostgreSQL: `uuid`) and has no default value.
+- **Database:** The primary key column uses the native UUID type (`uuid` in H2 and PostgreSQL) and has no default value.
 
 Example:
 

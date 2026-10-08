@@ -12,7 +12,7 @@ Unless explicitly overridden by the project specification:
 - **When:** Together with the code. A task is done only when `./gradlew check` is green.
 - **Where:**
     - `src/test/java`: unit tests of services, persistence mapper tests, `@WebMvcTest` slices, ArchUnit tests.
-    - `src/integrationTest/java`: everything that needs a real database or the full context (adapters, specifications, constraints, smoke flows, the changelog portability test on H2, the seed consistency test).
+    - `src/integrationTest/java`: everything that needs a database or the full context (adapters, specifications, constraints, smoke flows, the changelog portability test, the seed consistency test). The database is H2 in memory, with the same init script as the application.
     - `check` runs both source sets.
 - **How (service unit tests):**
     - JUnit with `MockitoExtension` (strict stubs). Subject: `@InjectMocks private <Class> testObject`. Collaborators: `@Mock`. Captors: `@Captor`.
@@ -123,7 +123,7 @@ assertEquals(FIRST_NAME, saved.firstName());                           // compar
 - Async code: Awaitility with an explicit timeout.
 
 ## Infrastructure
-- Gradle test dependencies: `spring-boot-starter-test`; for Spring Boot 4 slices the modular starters `spring-boot-starter-webmvc-test` and `spring-boot-starter-data-jpa-test`; Testcontainers (PostgreSQL) with the Boot-managed version; `archunit-junit5`; Awaitility; `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`.
+- Gradle test dependencies: `spring-boot-starter-test`; for Spring Boot 4 slices the modular starters `spring-boot-starter-webmvc-test` and `spring-boot-starter-data-jpa-test`; `archunit-junit5`; Awaitility; `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`. Testcontainers (PostgreSQL) is added only if PostgreSQL becomes the database.
 - Source set `integrationTest` extends the `test` dependencies; `check` depends on `integrationTest`.
 - AssertJ arrives with `spring-boot-starter-test` but is not used by convention: JUnit assertions only.
 - Formatting is enforced by Spotless, not by review.

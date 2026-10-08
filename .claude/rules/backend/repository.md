@@ -77,5 +77,5 @@ Spring Data JPA: `JpaRepository` and `JpaSpecificationExecutor`.
 
 ## Verification
 - ArchUnit: classes in `..repository.jpa..` are not public; the port package does not depend on `..repository.jpa..` or `jakarta.persistence..`; services do not depend on `..repository.jpa..`.
-- Integration tests per adapter (Testcontainers): insert, update, findById, each filter on its own and combined, `existsById`.
+- Integration tests per adapter (H2): insert, update, findById, each filter on its own and combined, `existsById`.
 - For a soft-deleted entity: `findAll` hides deleted records, `findById` returns them, `existsActiveById` is false for them.

@@ -1,6 +1,6 @@
 # Product: Screens
 
-**Status:** draft. Look and colors: [ui-style.md](ui-style.md). Rights: [operations.md](../domain/operations.md). Transitions: [work-order-lifecycle.md](../domain/work-order-lifecycle.md). Fields: [entities.md](../domain/entities.md).
+**Status:** agreed. Look and colors: [ui-style.md](ui-style.md). Rights: [operations.md](../domain/operations.md). Transitions: [work-order-lifecycle.md](../domain/work-order-lifecycle.md). Fields: [entities.md](../domain/entities.md).
 
 ## Principles
 - The frontend does not know the transition rules. For the current user and order the backend returns the transitions the user may use, each with `enabled` and, when it is not enabled, a short message. The UI draws exactly those actions, disables the ones that are not enabled and shows the message as the hint.
@@ -57,7 +57,7 @@ Actions (top right). Show the transitions the backend returns for this user and 
 | `IN_PROGRESS -> WAITING_FOR_PARTS` | Waiting for part | secondary |
 | `ON_HOLD <-> WAITING_FOR_PARTS` | Waiting for customer / Waiting for part | secondary |
 | `ON_HOLD`, `WAITING_FOR_PARTS` `-> IN_PROGRESS` | Resume work | primary |
-| `IN_PROGRESS -> READY` | Mark ready | primary; confirmation "The order lines cannot be changed after this"; disabled with the hint "Add at least one line" while the order has no lines |
+| `IN_PROGRESS -> READY` | Mark ready | primary; confirmation dialog (see Dialogs); disabled with the hint "Add at least one line" while the order has no lines |
 | `READY -> PAID` | Mark paid | primary; confirmation dialog; disabled with the hint "Record the payment first" until the balance is zero |
 | `PAID -> CLOSED` | Close order | primary; confirmation dialog |
 | rollback, one step back | Return to "Appointment" / "Accepted" / "In progress" | in the "More" menu; only the previous status is offered; confirmation dialog with a required reason; disabled with the hint "A payment is already recorded" once a payment exists |
@@ -65,7 +65,7 @@ Actions (top right). Show the transitions the backend returns for this user and 
 
 One primary action at a time. The "More" menu is for `MANAGER` only.
 
-Each action comes from the backend with `primary`, `enabled`, `commentRequired`, `confirm` and, when it is not enabled, a short message. The hints in the table are those backend messages.
+Each action comes from the backend with `label`, `targetStatus`, `group` (`PRIMARY` or `MORE`), `primary`, `enabled`, `commentRequired`, `confirm` and, when it is not enabled, a short message. The labels in the table are those backend labels. The hints in the table are those backend messages. The consequence texts of the dialogs live in the frontend strings.
 
 A "Print" button next to the actions opens the browser print dialog. A print stylesheet hides the sidebar, the buttons and the history and keeps the header, customer, vehicle, lines, total and payment. The printed card is the invoice (see [scope.md](scope.md)); there is no separate screen.
 
@@ -75,19 +75,19 @@ Sections:
 - **Work and parts.** Columns: position (with a small "service" / "part" label), quantity, price, performer, sum. Total below.
     - Buttons "Add service" and "Add part": pick from the price list; name and price are copied into the line; quantity 1; performer defaults to the responsible mechanic. Edit and remove per row.
     - From `READY` on, the buttons and row actions are hidden and a note "Lines are locked" is shown.
-- **Payment** (from `READY`). Total, paid, balance. Button "Record payment" (`MANAGER`): dialog with amount (prefilled with the total, must equal it), payment method (required: "Cash", "Card", "Transfer") and date (today). Payments are entered by hand, there is no payment system integration. After saving, the payment is listed (amount, method, date, who recorded it). The dialog warns: "A saved payment cannot be changed or cancelled."
+- **Payment** (from `READY`). Total, paid, balance. Button "Record payment" (`MANAGER`): dialog with amount (prefilled with the total, must equal it), payment method (required: "Cash", "Card", "Transfer") and date (prefilled with today, can be changed, not later than today; error "Date cannot be in the future"). Payments are entered by hand, there is no payment system integration. After saving, the payment is listed (amount, method, date, who recorded it). The dialog warns: "A saved payment cannot be changed or cancelled."
 - **History.** Newest first: from-badge → to-badge, who, when, comment.
 
 `MECHANIC` sees the same card without: editing problem description and mileage, "Record payment", the "More" menu, `Part.purchasePrice`. Editing lines and notes works only in own orders.
 
 ### Customers
 - List: search by full name and phone; columns: full name, phone, email, number of vehicles. Button "New customer" (`MANAGER`).
-- Card: details (edit and delete for `MANAGER`), vehicles with "Add vehicle", timeline of orders.
+- Card: details (edit and delete for `MANAGER`), vehicles with "Add vehicle", timeline of orders. Delete is rejected while the customer has a vehicle or an open order (see Messages).
 - `MECHANIC` can open the card from an order, read-only.
 
 ### Vehicles
 - List: search by license plate and VIN; columns: plate, make, model, year, owner, mileage. Button "New vehicle" (`MANAGER`).
-- Card: details, owner with "Change owner" (`MANAGER`, dialog with customer search), mileage, table of orders (history). Delete for `MANAGER`.
+- Card: details, owner with "Change owner" (`MANAGER`, dialog with customer search), mileage, table of orders (history). Delete for `MANAGER`, rejected while the vehicle has an open order.
 - `MECHANIC`: read-only.
 
 ### Price list (MANAGER)
@@ -95,7 +95,7 @@ Sections:
 - Add, edit, deactivate, activate. Switch "Show inactive" (off by default).
 
 ### Employees (MANAGER)
-- Table: full name, login, role, specialization, status. Add (with initial password), edit, deactivate, activate, "Reset password". A deactivated employee cannot log in until activated.
+- Table: full name, login, role, specialization, status. Add (with initial password), edit, deactivate, activate, "Reset password". A deactivated employee cannot log in until activated. The buttons "Deactivate" and the role field are disabled on the manager's own row.
 
 ### Change password (both)
 - Current password, new password, repeat. Opened from the user menu. The hint under the new password: "10 to 72 characters with a letter, a digit and a symbol".
@@ -123,6 +123,8 @@ Reversible actions (pauses, resume work, accept vehicle, start work) have no con
 - Validation errors under the field: "Required field", "Invalid email", "Too long, maximum {max} characters", "Year must be between 1900 and {next}", "Value cannot be negative", "Quantity must be greater than 0", "Password must be 10 to 72 characters and contain a letter, a digit and a symbol", "Current password is incorrect".
 - Duplicate email, VIN, login, code or SKU: error under the field, e.g. "A customer with this email already exists".
 - Another user changed the order meanwhile: "The order was changed by another user. Refresh the page."
+- Deleting a customer is rejected with "The customer still has vehicles or open orders. Change the owner or delete the vehicles first." Deleting a vehicle is rejected with "The vehicle has an open order."
+- An employee deactivating themselves or changing their own role is rejected with "You cannot deactivate yourself or change your own role."
 - Other backend rejections (forbidden transition, unmet condition): short toast with the reason.
 - Success: short toast. Saving buttons show a loading state.
 - Empty list: "Nothing found"; a customer without vehicles: "This customer has no vehicles yet" and the button "Add vehicle".

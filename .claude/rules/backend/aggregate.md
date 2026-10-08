@@ -90,7 +90,7 @@ The specification may declare another shape of aggregate or ask for a stored der
 
 ## Verification
 - ArchUnit: child entities are used only in `..repository.jpa..`; there is no port or service for an owned child; the domain record of a root has no `total` component; a dependent-record port has no `update` and no `delete`.
-- Integration tests (Testcontainers):
+- Integration tests (H2):
     - a root with lines is saved and loaded back unchanged;
     - removing a line deletes its row;
     - changing only a line raises the root's version by exactly one, and the returned version equals the stored one; the same when root fields change too;

@@ -14,10 +14,11 @@ What each role can do in the system. Status changes are defined in [work-order-l
 |---|---|---|
 | Log in | yes | yes |
 | Search (customers, vehicles) | yes | yes |
-| Filter the order list (status, intake date range, mechanic, vehicle) | own orders | all orders |
+| Filter the order list (status, intake date range, customer, mechanic, vehicle) | own orders | all orders |
 | View customers and vehicles | yes | yes |
 | Create, edit, delete customers and vehicles; change vehicle owner | no | yes |
 | Manage employees (create, edit, deactivate, activate) | no | yes |
+| List active mechanics (id and name only, to choose a line performer) | yes | yes |
 | Change own password | yes | yes |
 | Reset another employee's password | no | yes |
 | View price list (services and parts) | yes | yes |
@@ -41,6 +42,9 @@ What each role can do in the system. Status changes are defined in [work-order-l
 - `Part.purchasePrice` is visible to `MANAGER` only. A mechanic sees everything else in own orders, including prices, totals and payments.
 - A manager creates an employee with an initial password. Any employee can change their own password; only a manager can reset another employee's password.
 - A deactivated employee cannot log in until a manager activates the employee again.
+- An employee cannot deactivate themselves and cannot change their own role. This keeps at least one active manager. Two managers who try to deactivate each other at the same moment must not both succeed: the second request is rejected.
+- Deactivating a mechanic who has open orders is allowed. The orders stay; the manager reassigns the responsible mechanic.
+- The responsible mechanic and a line performer must be active employees with the role `MECHANIC`. A mechanic chooses a performer from the list of active mechanics, which shows only id and name.
 - A password has 10 to 72 characters and contains a letter, a digit and a symbol. It is stored only as a salted hash. A session lasts 12 hours; after that the employee logs in again.
 
 ## Prohibitions

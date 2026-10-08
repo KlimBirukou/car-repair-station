@@ -19,6 +19,7 @@ Unless explicitly overridden by the project specification:
 - **Read:** `@Transactional(readOnly = true)`.
 - **Write:** `@Transactional`.
 - **Lists:** Accept a filter record and `Pageable`, return `Page` (see the Pagination rule).
+- **Guarding a rule across several rows:** An operation whose rule depends on more than one row (an employee must not deactivate themselves; at least one active manager must stay) locks the rows it checks inside the transaction with a pessimistic write lock, in ascending id order so that two such operations cannot deadlock. After taking the locks it checks the rule again on the fresh data and writes. `@Version` alone does not protect it: two requests that change two different rows both pass the version check. The repository port has a method for this (for example `findAllByIdForUpdate(ids)`); the adapter implements it with `@Lock(LockModeType.PESSIMISTIC_WRITE)`.
 - **Null contract:** Use Lombok `@NonNull` on required parameters of `*ServiceImpl` methods. Lombok inserts the check into a method body; on the interface it is documentation only.
 - **Errors:** Throw `BusinessException` subclasses (see the Exceptions rule). Do not catch persistence exceptions.
 - **Logging:** Log successful state-changing operations at `INFO` with the entity ID, after the repository call returned (insert and update flush inside the adapter, so conflicts are thrown before the log line). Do not log routine reads or expected not-found/business exceptions.

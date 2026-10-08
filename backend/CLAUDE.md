@@ -26,9 +26,9 @@ Read every file in `.claude/rules/backend/` before writing or changing backend c
 
 ### Stack and versions
 - Java 25, Spring Boot 4.0.5, Gradle (Groovy DSL) with the wrapper. Versions are pinned; upgrade only on request.
-- PostgreSQL, Liquibase (YAML), Spring Data JPA (Hibernate), Bean Validation. H2 is used only by the changelog portability test.
+- H2 (D-052; PostgreSQL may replace it later), Liquibase (YAML), Spring Data JPA (Hibernate), Bean Validation.
 - Lombok, MapStruct, springdoc-openapi, uuid-creator, Spring Security (BCrypt and JWT).
-- Tests: JUnit, Mockito, Testcontainers (PostgreSQL), ArchUnit.
+- Tests: JUnit, Mockito, ArchUnit. Integration tests run on H2.
 
 ### Architecture and packages
 - Package-by-feature, ports and adapters, one layout for every feature: `.claude/rules/backend/structure.md`. The base package is `com.carrepair.station`, the Gradle group is `com.carrepair`.

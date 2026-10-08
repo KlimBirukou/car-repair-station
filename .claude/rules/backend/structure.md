@@ -42,6 +42,7 @@ Unless explicitly overridden by the project specification:
 
 - **Dependencies:** `web` → `service` → `repository` (port) ← `repository.jpa`. Domain records in the feature root may be used by every layer. The port never depends on `repository.jpa`.
 - **Cross-feature:** A feature may use another feature's domain records, repository port (for example `existsById`) and service interface. It must not use another feature's `repository.jpa`, `*ServiceImpl` or `web` package.
+- **Deletion guards:** A feature that must refuse an operation because of data it does not own (a customer is not deleted while a vehicle or an open order refers to it) declares a guard port in its own feature root, for example `CustomerDeletionGuard`, with one method that returns the reason or nothing. The features that own the data (`vehicle`, `workorder`) implement the port in their `service` package. The guarded feature depends only on its own port, so there is no cycle. Its service calls every guard and throws the first reason as a `CONFLICT`. Until a feature that owns the data exists, there is no implementation for it.
 - **Visibility:** Everything in `repository.jpa` is package-private. The rest is public.
 - **Naming:** Package names are lowercase without underscores (`workorder`, not `work_order`). `<Feature>` is the name of the feature or aggregate.
 

@@ -8,7 +8,7 @@ paths:
 ## Default
 Unless explicitly overridden by the project specification:
 
-- **What:** The schema and the seed data are defined only by Liquibase changelogs in YAML. They are database-agnostic: PostgreSQL is the main database, and H2 checks the portability (see Verification).
+- **What:** The schema and the seed data are defined only by Liquibase changelogs in YAML. They are database-agnostic: H2 is the database now (D-052), PostgreSQL may replace it later, and the changelogs must stay portable (see Verification).
 - **When:** For every table, constraint, index and seed row.
 - **Where:** `backend/src/main/resources/db/`
 
@@ -37,13 +37,13 @@ db/
     - An enum is `VARCHAR(30)` with a check constraint `ck_<table>_<column>` that lists the values.
     - Every foreign key has `onDelete: RESTRICT`, `onUpdate: RESTRICT` and an index on its column.
 - **How (portability):** Only generic Liquibase types and plain SQL. A check constraint is a `sql` change with its own `rollback`, and its table is written as `${schema}.<table>`. Structured changes carry no `schemaName`: the schema is set once in the configuration.
-- **How (schema):** The environment creates the schema from the one script `db/init/create-schema.sql`: Docker Compose mounts it into the PostgreSQL init directory, Testcontainers runs it with `withInitScript`, and the H2 URL runs it with `INIT=RUNSCRIPT FROM 'classpath:db/init/create-schema.sql'`. `spring.liquibase.default-schema` and `spring.jpa.properties.hibernate.default_schema` are both `repair_schema`.
+- **How (schema):** The application creates the schema from the one script `db/init/create-schema.sql`: the H2 URL runs it with `INIT=RUNSCRIPT FROM 'classpath:db/init/create-schema.sql'`, for the application and for the tests alike. `spring.liquibase.default-schema` and `spring.jpa.properties.hibernate.default_schema` are both `repair_schema`. If PostgreSQL comes later, the same script is run by its init mechanism.
 - **How (seed):**
     - `seed-changelog.yaml` has one changeset per table in dependency order, each with `context: seed`, `runOnChange: true` and `loadUpdateData` with `primaryKey: id`. The columns have explicit types (`UUID`, `STRING`, `NUMERIC`, `BOOLEAN`, `DATE`, `DATETIME`).
     - Ids are fixed UUID v7 literals (see the Entity Identifiers rule). A live soft-delete row holds the constant `00000000-0000-0000-0000-000000000000` in `delete_token`, a deleted row holds its own id.
     - What the seed contains is defined in `docs/product/seed-data.md`.
 - **How (contexts):** Every profile sets `spring.liquibase.contexts` explicitly, because without a context Liquibase runs all changesets, the seed included: `dev` → `seed`, `test` → `test` (matches nothing), any other profile → `prod`.
-- **How (freeze):** The schema and the seed are built first and shown to the human. Until the human records "Schema frozen" in `docs/decisions.md`, the changelogs may be rewritten, and the development database is recreated (`docker compose down -v`). After the freeze an applied changeset is never edited: a change is a new changeset, on H2 too.
+- **How (freeze):** The schema and the seed are built first and shown to the human. Until the human records "Schema frozen" in `docs/decisions.md`, the changelogs may be rewritten, and the development database is recreated (restart the application: the development H2 database lives in memory). After the freeze an applied changeset is never edited: a change is a new changeset, on H2 too.
 
 Example (a table file):
 
@@ -133,7 +133,7 @@ Example (a seed changeset):
 - Before the freeze a rewrite gives a clean schema (one `create` per table with its final columns). After it the rule is the usual one and works on every database.
 
 ## Exceptions
-If the course requires H2 as the main database, switch the profile. Then the whole integration suite must be run on H2 first, and the constraint-name normalization in the exception handler adapted if H2 reports names differently. The changelogs stay as they are.
+If the course requires PostgreSQL as the main database, add a profile for it. Then the whole integration suite must be run on it first (Testcontainers), and the constraint-name normalization in the exception handler adapted if it reports names differently. The changelogs stay as they are.
 
 ## Prohibitions
 - No `schemaName` in a structured change and no hardcoded schema in raw SQL: use `${schema}`.
@@ -151,12 +151,12 @@ If the course requires H2 as the main database, switch the profile. Then the who
 
 ## Infrastructure
 - Spring Boot Liquibase support; `spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml`.
-- `testRuntimeOnly 'com.h2database:h2'` for the portability test.
-- Docker Compose mounts `db/init/create-schema.sql` into the PostgreSQL image's init directory.
+- `runtimeOnly 'com.h2database:h2'`.
+- The H2 URL runs `db/init/create-schema.sql` (see How (schema)).
 
 ## Verification
 - `ChangelogPortabilityTest` in `src/integrationTest`: H2 in memory, context `seed`; every changeset and the seed apply, and every seeded table has rows.
-- `SeedConsistencyTest` (Testcontainers, context `seed`): the consistency rules of `docs/product/seed-data.md`.
-- `ddl-auto=validate` passes on PostgreSQL.
+- `SeedConsistencyTest` (H2, context `seed`): the consistency rules of `docs/product/seed-data.md`.
+- `ddl-auto=validate` passes on H2.
 - Convention test over the YAML files: every `*-changelog.yaml` is included by the master; every constraint and index name starts with `pk_`, `fk_`, `uk_`, `idx_` or `ck_`; no id is repeated.
 - Reviewer checklist: file-per-table, the include order, explicit names, a `rollback` on every `sql` change, `context: seed` on every seed changeset, no item from Prohibitions.

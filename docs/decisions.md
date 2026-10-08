@@ -4,10 +4,10 @@ Log of decisions made by the human, with the reasons. Newest first. Agents read 
 
 ## Open
 Not decided yet. A run that needs one of these must stop and report it, not guess.
-- Badge colours for the statuses other than `IN_PROGRESS`, `CLOSED` and `CANCELLED` (`ui-style.md`).
-- Who writes work items and tasks, and whether the human approves the split before a run. The agreed shape is two levels: broad work items from the human, concrete tasks from the agents.
-- Skills and MCP servers (Context7, Playwright) are declared after the agents.
-- Rules not written yet: domain records and the frontend rules.
+
+- Who writes work items and tasks, and whether the human approves the split before a run. The agreed shape is two levels: broad work items from the human, concrete tasks from the agents. (The planner writes the tasks since D-051; whether the human approves the split before a run is still open.)
+- MCP servers (Context7, Playwright) are not connected and no other skills are created (D-051 declared `plan` and `evaluate-plan`).
+- Rules not written yet: the frontend rules (in a draft; until then `frontend/CLAUDE.md` is the rule set) and the domain records rule.
 
 ## Format
 ```
@@ -19,6 +19,74 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 ```
 
 ## Log
+
+### D-059 Transitions carry label, target and group; the order carries `linesEditable` (2026-10-08)
+- **Decision:** Each transition in the order response has `label`, `targetStatus` and `group` (`PRIMARY` or `MORE`) next to the existing fields. The order response has a boolean `linesEditable` from `WorkOrderStatus.linesEditable()`. The consequence texts of the confirmation dialogs stay in the frontend strings.
+- **Reason:** The frontend must not map transition ids to statuses or repeat the status rule; it draws what the backend returns.
+- **Alternatives rejected:** a map keyed by transition id in the frontend (status logic leaks); the frontend deriving editable lines from the status.
+- **Affects:** `state-machine.md`, `docs/product/screens.md`, `frontend/CLAUDE.md`.
+
+### D-058 A mechanic can list active mechanics (id and name) (2026-10-08)
+- **Decision:** A read for both roles returns active employees with the role `MECHANIC`, with id and name only. A mechanic uses it to choose a line performer. The responsible mechanic and a line performer must be active `MECHANIC` employees.
+- **Reason:** A mechanic edits lines of own orders but cannot read the employee list (managers only). The read exposes no other field.
+- **Alternatives rejected:** only the manager assigns performers (narrows the mechanic's rights); the performer is always the mechanic who edits.
+- **Affects:** `docs/domain/operations.md`, `docs/domain/entities.md`.
+
+### D-057 The payment date is prefilled and not in the future (2026-10-08)
+- **Decision:** The payment date is prefilled with today in the station zone, may be changed, and cannot be later than today.
+- **Reason:** The payment is entered by hand after the money is received; a future date is always a mistake. A past date is allowed for a payment entered late.
+- **Alternatives rejected:** the system sets the date and it cannot be changed; no limit.
+- **Affects:** `docs/domain/entities.md`, `docs/product/screens.md`.
+
+### D-056 Employee rules: no self-deactivation, no role change of oneself, row locks (2026-10-08)
+- **Decision:** An employee cannot deactivate themselves or change their own role, so at least one active manager always remains. Two managers deactivating each other at the same moment are handled in the service: it locks the rows it checks with a pessimistic write lock in id order, then checks the rule again. Deactivating a mechanic with open orders is allowed; the manager reassigns the responsible mechanic.
+- **Reason:** A rule over several rows is not protected by `@Version` of single rows (write skew). A short row lock works on H2 and PostgreSQL alike.
+- **Alternatives rejected:** `SERIALIZABLE` isolation (differs between databases); accepting the risk; forbidding to deactivate a mechanic with open orders.
+- **Affects:** `docs/domain/operations.md`, `docs/domain/entities.md`, `service.md`, `docs/product/screens.md`.
+
+### D-055 Deleting a customer or a vehicle is guarded by a port (2026-10-08)
+- **Decision:** A customer cannot be deleted while they have a non-deleted vehicle or an open order. A vehicle cannot be deleted while it has an open order. An open order is any order except `CLOSED` and `CANCELLED`. The features that own the data implement a guard port declared by the guarded feature.
+- **Reason:** A deleted customer must not stay the owner of a live vehicle, and an open order must not refer to a deleted record (`seed-data.md`, rule 5). A sold vehicle goes through "Change owner", so its history stays with one record. The port avoids a cycle between features.
+- **Alternatives rejected:** deleting the vehicles together with the customer (splits the history of a vehicle that gets a new owner); allowing deletion and leaving a deleted owner.
+- **Affects:** `docs/domain/entities.md`, `docs/product/screens.md`, `structure.md`.
+
+### D-054 `screens.md` is agreed; "Mark ready" has one text (2026-10-08)
+- **Decision:** `docs/product/screens.md` has the status agreed. The confirmation of "Mark ready" is the dialogs-table text "The order lines will be locked." and the actions table points to it.
+- **Reason:** The two texts differed; the dialogs table is where consequence texts live.
+- **Alternatives rejected:** keeping both.
+- **Affects:** `docs/product/screens.md`.
+
+### D-053 The order list customer filter exists for both roles (2026-10-08)
+- **Decision:** The filter by customer is in `operations.md`. For a mechanic it narrows only own orders.
+- **Reason:** `entities.md` already listed it; the files disagreed.
+- **Alternatives rejected:** removing it.
+- **Affects:** `docs/domain/operations.md`.
+
+### D-052 The database is H2; there is no Docker (2026-10-08)
+- **Decision:** The backend and the frontend run locally and the database is H2 (in memory), for the application and for the tests. Docker Compose and Testcontainers are not used. The changelogs stay database-agnostic, so PostgreSQL may replace H2 later; then the integration suite runs on it first (see `liquibase.md`, Exceptions). This replaces D-022 and the Docker parts of D-024.
+- **Reason:** The human does not know yet what the course requires and wants no Docker for now. H2 needs no infrastructure.
+- **Alternatives rejected:** PostgreSQL with Docker Compose; H2 only for one portability test.
+- **Affects:** root `CLAUDE.md`, `TASK.md`, `backend/CLAUDE.md`, `liquibase.md`, `testing.md`, `db-dev.md`, `.claude/settings.json`.
+
+
+### D-051 The plan lives in `context/`; the planner writes it; two skills drive planning (2026-10-08)
+- **Decision:** The assignment's file names are used. `TASK.md` (repository root) is the entry description of the product and points to `docs/`. `context/PLAN.md` replaces `docs/plan.md`; `context/PLAN_REVIEW.md` holds the review of the plan. The `planner` writes `context/PLAN.md` itself, in two modes: `plan` (build it) and `revise` (read `PLAN_REVIEW.md`, update the plan, list the changes). The orchestrator still owns task statuses, assumptions and the run summary. The `reviewer` gets a "Plan review" mode that compares the plan with `TASK.md` and `docs/`, and returns a verdict. Two skills: `plan` (checks that `TASK.md` exists, then starts the planner) and `evaluate-plan` (starts the reviewer in plan review mode and saves `context/PLAN_REVIEW.md` with the verdict `READY`, `READY WITH MINOR CHANGES` or `REVISE BEFORE IMPLEMENTATION`). The initial task status is `pending`. The orchestrator and the planner stay two agents. The skills are the only skills; MCP servers are still not connected.
+- **Reason:** The learning assignment names these files and asks for a planner with a revision loop and an evaluator. Keeping the planner separate keeps the long reading of all documents out of the orchestrator's context and gives each agent narrow rights. This changes D-008 ("only the orchestrator writes the plan") and D-042 (the orchestrator edits only `docs/plan.md`).
+- **Alternatives rejected:** merging the planner into the orchestrator (mixed rights, long context, no separate planner as the assignment asks); keeping `docs/plan.md` next to `context/PLAN.md` (two plan files).
+- **Affects:** root `CLAUDE.md`, `.claude/agents/`, `.claude/settings.json`, `.claude/skills/`, `TASK.md`, `context/`.
+
+### D-050 Status badge colours (2026-10-08)
+- **Decision:** Badge colours for the six remaining statuses are in `docs/product/ui-style.md`: sand (`APPOINTMENT`), khaki (`WORK_ORDER`), plum (`ON_HOLD`), orange (`WAITING_FOR_PARTS`), light green (`READY`), deeper green (`PAID`). The three already chosen colours do not change. No badge is red. Every pair has a contrast ratio of at least 4.5:1.
+- **Reason:** The colours follow the lifecycle and the warm palette. The two pauses share a board column, so they get clearly different hues. Green reads as "done on our side", and red stays reserved for actions.
+- **Alternatives rejected:** blue or cold tones (they break the warm palette); red for any status.
+- **Affects:** `docs/product/ui-style.md`, `docs/domain/work-order-lifecycle.md`.
+
+### D-049 Every agent runs on Sonnet 5.5 (2026-10-08)
+- **Decision:** All six agents use `claude-sonnet-5-5`, the planner included.
+- **Reason:** Chosen by the human. Replaces the Opus planner of D-040.
+- **Alternatives rejected:** Opus for the planner.
+- **Affects:** `.claude/agents/planner.md`, root `CLAUDE.md`.
+
 
 ### D-048 Web layer defaults (2026-10-05)
 - **Decision:** Create is 201 with a body and no `Location` header; `PUT` and commands are 200 with the resource; deleting a customer or a vehicle is 204. Activate and deactivate are `POST /{id}/activate` and `/deactivate`; the owner of a vehicle is `PUT /vehicles/{id}/owner`. Resource names are plural kebab-case. A day in a filter becomes a range of instants in the station zone. Search is its own feature `search`, at most 5 results per group, unpaged. The board is one list request per column. Swagger UI and the API document exist only in `dev` and `test`. Every response field is required or explicitly nullable.
@@ -54,10 +122,10 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Decision:** The worker takes the most conservative reading and reports it, and the orchestrator records it under "Assumptions" in `plan.md`. The agent stops instead when the question touches the Open list in this file, anything postponed or out of scope, money, rights and roles, deleting data, or a schema change after the freeze.
 - **Reason:** A run can reach its end without the human, who reviews the assumptions afterwards (run, remarks, second run). The five areas are where a wrong guess costs most.
 - **Alternatives rejected:** always stop (the run may stall); always assume (a guess can drag code with it).
-- **Affects:** root `CLAUDE.md`, all agents, `docs/plan.md`.
+- **Affects:** root `CLAUDE.md`, all agents, `context/PLAN.md` (was `docs/plan.md`, see D-051).
 
 ### D-042 The orchestrator is an agent, and tasks run one at a time (2026-10-05)
-- **Decision:** A run starts with `claude --agent orchestrator`. Its tools are the Agent tool limited to the five other agents, Read, Grep, Glob and Edit. It has no shell and, by instruction, edits only `docs/plan.md`. Tasks run sequentially without worktrees: the schema and the seed first, then backend, then frontend.
+- **Decision:** A run starts with `claude --agent orchestrator`. Its tools are the Agent tool limited to the five other agents, Read, Grep, Glob and Edit. It has no shell and, by instruction, edits only the plan (`docs/plan.md`, now `context/PLAN.md`, see D-051). Tasks run sequentially without worktrees: the schema and the seed first, then backend, then frontend.
 - **Reason:** An explicit list of agents it may call and no way to run the gates itself. Sequential runs avoid conflicts over ports, the database and merging.
 - **Alternatives rejected:** a plain main session; parallel workers in worktrees (ports and a database per worktree, a separate `node_modules`, merging).
 - **Affects:** `.claude/agents/orchestrator.md`, root `CLAUDE.md`.
@@ -69,7 +137,7 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Affects:** `.claude/settings.json`, root `CLAUDE.md`.
 
 ### D-040 Six agents; Opus only for the planner (2026-10-05)
-- **Decision:** `orchestrator`, `planner`, `db-dev`, `backend-dev`, `frontend-dev`, `reviewer`. The planner runs on Opus 5.5, the others on Sonnet 5.5. The planner and the reviewer use high effort. `db-dev` is the author of the changesets.
+- **Decision:** `orchestrator`, `planner`, `db-dev`, `backend-dev`, `frontend-dev`, `reviewer`. The planner runs on Opus 5.5, the others on Sonnet 5.5 (the planner model was replaced by D-049: all agents run on Sonnet 5.5). The planner and the reviewer use high effort. `db-dev` is the author of the changesets.
 - **Reason:** The schema and the seed come first and need a clean context. The planner runs rarely, so a stronger model is affordable there, while the reviewer runs on every task.
 - **Alternatives rejected:** four roles (the schema work bloats `backend-dev`); a separate tester and security reviewer (add them if the first run shows gaps); Opus for the reviewer (cost).
 - **Affects:** `.claude/agents/`, root `CLAUDE.md`.
@@ -176,7 +244,7 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Alternatives rejected:** immutable from day one (a pile of `alter` changesets after the first mistake).
 - **Affects:** `liquibase.md`, `backend/CLAUDE.md`.
 
-### D-022 Changelogs are agnostic YAML, one file per table; PostgreSQL is main, H2 is checked (2026-10-05)
+### D-022 Changelogs are agnostic YAML, one file per table; PostgreSQL is main, H2 is checked (2026-10-05, replaced by D-052)
 - **Decision:** Liquibase in YAML, one file per table, one changeset per change. PostgreSQL is the main database. One portability test applies all changelogs and the seed to H2 in memory.
 - **Reason:** The course may require H2 and the human does not choose the database yet. A one-test check keeps the switch cheap. If H2 becomes the main database, the integration suite is re-run on it first.
 - **Alternatives rejected:** PostgreSQL only without a check; the whole suite on both databases (costly).
@@ -261,7 +329,7 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Affects:** `docs/domain/operations.md`.
 
 ### D-008 Tasks belong to one area (2026-10-05)
-- **Decision:** A task has one area, may depend on other tasks and may be `blocked`. A feature touching both areas is split, backend first. Only the orchestrator writes `docs/plan.md`.
+- **Decision:** A task has one area, may depend on other tasks and may be `blocked`. A feature touching both areas is split, backend first. Only the orchestrator writes the plan. (Changed by D-051: the planner writes the task list in `context/PLAN.md`; the orchestrator owns the statuses.)
 - **Reason:** Matches "a worker edits only its own area" and contract-first; no write conflicts in the plan.
 - **Alternatives rejected:** one agent for a whole vertical slice; one plan file written by every worker. Who sets the tasks and the two-level structure are deferred.
 - **Affects:** root `CLAUDE.md`, `docs/plan.md`.

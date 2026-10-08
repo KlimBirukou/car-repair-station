@@ -1,27 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Edit(/docs/plan.md)",
+      "Edit(/context/**)",
+      "Write(/context/**)",
       "Bash(./gradlew *)",
       "Bash(npm run *)",
       "Bash(npm ci)",
       "Bash(npm install)",
       "Bash(npx playwright *)",
-      "Bash(docker compose *)",
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git show *)"
-    ],
-    "deny": [
-      "Edit(/docs/domain/**)",
-      "Edit(/docs/product/**)",
-      "Edit(/docs/decisions.md)",
-      "Edit(/.claude/rules/**)",
-      "Edit(/.claude/agents/**)",
-      "Edit(/.claude/settings.json)",
-      "Bash(git commit *)",
-      "Bash(git push *)"
     ]
   }
 }

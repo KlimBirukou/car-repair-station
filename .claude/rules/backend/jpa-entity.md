@@ -71,4 +71,4 @@ Join entities that consist only of two IDs have a composite key and no `version`
 - ArchUnit: every `@Entity` has a `@Version` field of wrapper type `Long`; no field has `@GeneratedValue`; no association annotations; entity classes are not public and reside in `..repository.jpa..`.
 - `lombok.config` turns `@Data` into a compile error.
 - Integration test per soft-deleted entity: a deleted record is not in `findAll`, is returned by `findById`, and its unique value can be used again.
-- Integration test per entity (Testcontainers): insert, update, unique violation. `ddl-auto=validate` fails the context if the mapping and the migrations diverge.
+- Integration test per entity (H2): insert, update, unique violation. `ddl-auto=validate` fails the context if the mapping and the migrations diverge.
