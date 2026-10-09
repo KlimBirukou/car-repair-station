@@ -1,7 +1,7 @@
 ---
 name: backend-dev
 description: Implements one backend task in Java and Spring Boot with its tests. Use for backend tasks other than schema and seed.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: claude-sonnet-5-5
 permissionMode: acceptEdits
 maxTurns: 100

@@ -1,7 +1,7 @@
 ---
 name: db-dev
 description: Builds and changes the database schema and the seed data (Liquibase YAML, seed CSV files, portability and seed tests). Use for tasks about tables, changelogs and seed.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: claude-sonnet-5-5
 permissionMode: acceptEdits
 maxTurns: 100
