@@ -1,11 +1,16 @@
 # Domain: Entities
 
-**Status:** agreed (v1). Amended: aggregates, removal of order lines, `ServiceItem`, optional email, free-format VIN, `active` (see `docs/decisions.md`).
+**Status:** agreed (v1). Amended: aggregates, removal of order lines, `ServiceItem`, optional email, free-format VIN,
+`active` (see `docs/decisions.md`), order number, creation record in the history, read-only closed orders.
 
-Business view only. Technical fields (`id`, `version`, the soft-delete token) and storage details are defined in the "how" rules, not here. A timestamp with business meaning (for example `intakeDate`, `changedAt`) is a domain field and is listed below.
+Business view only. Technical fields (`id`, `version`, the soft-delete token) and storage details are defined in the
+"how" rules, not here. A timestamp with business meaning (for example `intakeDate`, `changedAt`) is a domain field and
+is listed below.
 
 ## Types
+
 General types, not tied to any language or database:
+
 - `string` — short text; `text` — long free-form text
 - `integer` — whole number; `decimal` — number with a fractional part
 - `money` — amount in the station's single currency (lari, shown with `₾` on screens)
@@ -18,11 +23,13 @@ All fields are required unless marked `(optional)`.
 ## Entities
 
 ### Customer
+
 - `fullName` — string
 - `phone` — string
 - `email` — string (optional)
 
 ### Vehicle
+
 - `vin` — string. Free format: it does not have to be a standard 17-character VIN
 - `licensePlate` — string
 - `make` — string
@@ -33,6 +40,7 @@ All fields are required unless marked `(optional)`.
 - `customer` — reference to Customer, the current owner
 
 ### Employee
+
 - `fullName` — string
 - `role` — enum `MECHANIC` | `MANAGER`
 - `login` — string
@@ -41,7 +49,9 @@ All fields are required unless marked `(optional)`.
 - `active` — boolean. A deactivated employee cannot log in
 
 ### ServiceItem (price list)
+
 Shown on screens as "Services". Named `ServiceItem` so that it does not clash with the `service` layer in code.
+
 - `code` — string
 - `name` — string
 - `standardHours` — decimal. Reference only: estimated duration of the work, not used in calculations
@@ -49,6 +59,7 @@ Shown on screens as "Services". Named `ServiceItem` so that it does not clash wi
 - `active` — boolean
 
 ### Part (price list)
+
 - `sku` — string
 - `name` — string
 - `purchasePrice` — money
@@ -56,18 +67,26 @@ Shown on screens as "Services". Named `ServiceItem` so that it does not clash wi
 - `active` — boolean
 
 ### WorkOrder
-- `intakeDate` — datetime. When the customer brings the vehicle (planned time while the status is `APPOINTMENT`)
+
+- `number` — integer. The order number shown to people (header, lists, the printed card). Assigned by the system when
+  the order is created, from a database sequence; unique, never changed, never reused; not entered by hand
+- `intakeDate` — datetime. When the customer brings the vehicle (planned time while the status is `APPOINTMENT`). A
+  manager can change it while the status is `APPOINTMENT` (the appointment is moved)
 - `mileage` — integer, kilometres (optional). Odometer reading at intake; may be empty while the status is `APPOINTMENT`
 - `status` — enum, see [work-order-lifecycle.md](work-order-lifecycle.md); initial `APPOINTMENT`
 - `vehicle` — reference to Vehicle
-- `customer` — reference to Customer. Owner at the moment the order was created; never changes, even if the vehicle later changes owner
-- `problemDescription` — text. The problem as described by the customer (for example "knocking noise at the front on bumps")
+- `customer` — reference to Customer. Owner at the moment the order was created; never changes, even if the vehicle
+  later changes owner
+- `problemDescription` — text. The problem as described by the customer (for example "knocking noise at the front on
+  bumps")
 - `diagnosticNotes` — text (optional)
 - `manager` — reference to Employee, the responsible service advisor
-- `mechanic` — reference to Employee, the responsible mechanic (optional until assigned). Several mechanics can work on one order: each line may have its own `performer`
+- `mechanic` — reference to Employee, the responsible mechanic (optional until assigned). Several mechanics can work on
+  one order: each line may have its own `performer`
 - total — money, derived: sum of line totals, not entered by hand
 
 ### WorkOrderLine
+
 - `workOrder` — reference to WorkOrder
 - `serviceItem` or `part` — reference to ServiceItem or Part, exactly one of them
 - `name` — string. Snapshot of the service/part name at the time of adding
@@ -77,23 +96,29 @@ Shown on screens as "Services". Named `ServiceItem` so that it does not clash wi
 - line total — money, derived: `quantity` × `price`
 
 ### Payment
+
 - `workOrder` — reference to WorkOrder
 - `amount` — money, equal to the order total (no partial payments or refunds)
 - `date` — date. Prefilled with today in the station zone; may be changed, but not to a future date
 - `method` — enum `CASH` | `CARD` | `TRANSFER`
 - `recordedBy` — reference to Employee, who recorded the payment
 
-No payment system integration: the system does not verify who pays. It stores the employee who recorded the payment, the method, and the order (and so its customer).
+No payment system integration: the system does not verify who pays. It stores the employee who recorded the payment, the
+method, and the order (and so its customer).
 
 ### WorkOrderStatusHistory
+
 - `workOrder` — reference to WorkOrder
-- `fromStatus` — enum
+- `fromStatus` — enum (optional). Empty only in the first record, which is written when the order is created
 - `toStatus` — enum
 - `employee` — reference to Employee
 - `changedAt` — datetime
 - `comment` — text (optional)
+  Creating an order writes the first record: `fromStatus` empty, `toStatus` `APPOINTMENT`, `employee` the creator,
+  `changedAt` the time of creation, no comment.
 
 ## Relations
+
 - Customer 1 — N Vehicle (current owner)
 - Customer 1 — N WorkOrder
 - Vehicle 1 — N WorkOrder
@@ -104,34 +129,56 @@ No payment system integration: the system does not verify who pays. It stores th
 - WorkOrderLine N — 1 ServiceItem or Part
 
 ## Aggregates
-- WorkOrder is an aggregate root. WorkOrderLine is part of it: it exists only inside its order and is changed only through the order.
-- Payment and WorkOrderStatusHistory depend on the order: they are only added, never changed or deleted, and refer to the order by id. One order has at most one payment and a short status history, so both are small collections.
-- The work order is changed by several users (manager, mechanics), so it is version-controlled: a change made on a stale copy is rejected (see the message in `docs/product/screens.md`).
+
+- WorkOrder is an aggregate root. WorkOrderLine is part of it: it exists only inside its order and is changed only
+  through the order.
+- Payment and WorkOrderStatusHistory depend on the order: they are only added, never changed or deleted, and refer to
+  the order by id. One order has at most one payment and a short status history, so both are small collections.
+- The work order is changed by several users (manager, mechanics), so it is version-controlled: a change made on a stale
+  copy is rejected (see the message in `docs/product/screens.md`).
 - Every other entity is standalone.
 
 ## Uniqueness
-- Unique: `Customer.email`, `Vehicle.vin`, `Employee.login`, `ServiceItem.code`, `Part.sku`.
+
+- Unique: `Customer.email`, `Vehicle.vin`, `Employee.login`, `ServiceItem.code`, `Part.sku`, `WorkOrder.number`.
 - A customer without an email does not take part in the email uniqueness.
-- Emails and logins are stored trimmed and in lower case, VINs trimmed and in upper case, so that the comparison ignores case.
+- Emails and logins are stored trimmed and in lower case, VINs trimmed and in upper case, so that the comparison ignores
+  case.
 - Not unique: `Customer.phone` (a family may share a number), `Vehicle.licensePlate` (plates get re-registered).
-- Uniqueness applies to non-deleted records only.
+- Uniqueness applies to non-deleted records only. The order number is unique among all orders: orders are never deleted.
 
 ## Deletion
+
 - Customer, Vehicle: soft delete. Deleted records are hidden from search and selection but stay linked from old orders.
 - An **open order** is an order in any status except `CLOSED` and `CANCELLED`.
-- A customer cannot be deleted while they have a non-deleted vehicle or an open order. The manager first changes the owner of each vehicle or deletes it. A vehicle cannot be deleted while it has an open order. The rejection names the reason (see the messages in `docs/product/screens.md`).
-- Employee, ServiceItem, Part: deactivated instead of deleted. Inactive ones cannot be chosen for new orders but stay linked from old orders. Deactivating an employee who still has open orders is allowed; the manager reassigns the responsible mechanic. An employee cannot deactivate themselves and cannot change their own role.
+- A customer cannot be deleted while they have a non-deleted vehicle or an open order. The manager first changes the
+  owner of each vehicle or deletes it. A vehicle cannot be deleted while it has an open order. The rejection names the
+  reason (see the messages in `docs/product/screens.md`).
+- Employee, ServiceItem, Part: deactivated instead of deleted. Inactive ones cannot be chosen for new orders but stay
+  linked from old orders. Deactivating an employee who still has open orders is allowed; the manager reassigns the
+  responsible mechanic. An employee cannot deactivate themselves and cannot change their own role. The last active
+  manager cannot be deactivated and cannot lose the role: at least one active manager always remains.
 - WorkOrder, Payment, WorkOrderStatusHistory: never deleted. An order is cancelled, not removed.
-- WorkOrderLine: can be removed while the order is editable (before `READY`). From `READY` on lines are read-only and are not removed. After a rollback to `IN_PROGRESS` they are editable and removable again.
+- WorkOrderLine: can be removed while the order is editable (before `READY`). From `READY` on lines are read-only and
+  are not removed. After a rollback to `IN_PROGRESS` they are editable and removable again.
 
 ## Rules
-- Changing a vehicle's owner is an explicit operation on the existing vehicle. It does not touch existing orders. A duplicate VIN is rejected.
-- When an order's `mileage` is set, the vehicle's `mileage` is updated to the same value.
-- Order lines (and therefore the total) can be changed only while the order status is `APPOINTMENT`, `WORK_ORDER`, `IN_PROGRESS`, `ON_HOLD` or `WAITING_FOR_PARTS`. From `READY` on (`READY`, `PAID`, `CLOSED`, `CANCELLED`) they are read-only. A manager rollback `READY -> IN_PROGRESS` makes them editable again.
+
+- Changing a vehicle's owner is an explicit operation on the existing vehicle. It does not touch existing orders. A
+  duplicate VIN is rejected.
+- When an order's `mileage` is set or changed, the vehicle's `mileage` is updated to the same value only if no other
+  order of this vehicle with a later `intakeDate` has a mileage. A correction of an older order does not change the
+  vehicle.
+- Order lines (and therefore the total) can be changed only while the order status is `APPOINTMENT`, `WORK_ORDER`,
+  `IN_PROGRESS`, `ON_HOLD` or `WAITING_FOR_PARTS`. From `READY` on (`READY`, `PAID`, `CLOSED`, `CANCELLED`) they are
+  read-only. A manager rollback `READY -> IN_PROGRESS` makes them editable again.
 - Search: customers by full name and phone; vehicles by license plate and VIN.
 - Order list filters: status, intake date range, customer, mechanic, vehicle.
+- An order in `CLOSED` or `CANCELLED` is read-only in every respect: lines, problem description, mileage, diagnostic
+  notes and the responsible mechanic cannot be changed (see [operations.md](operations.md)).
 
 ## Validation
+
 - Required string and text fields must not be blank.
 - `Customer.email`, when present, must be a valid email address.
 - `Vehicle.vin` has no fixed length or format; it must not be blank.
@@ -143,7 +190,9 @@ No payment system integration: the system does not verify who pays. It stores th
 - The responsible mechanic and a line performer must be active employees with the role `MECHANIC`.
 
 ## Prohibitions
+
 - Do not edit this file without human approval. If a rule is missing, ask instead of guessing.
 
 ## Open Questions
+
 - None.

@@ -105,6 +105,10 @@ counterpart; do not write it inside a form.
 - A rule that depends on the user's role is not a client rule.
 - Optional fields are sent as `null` or omitted exactly as the generated request type says; an empty string is not "no
   value" unless the backend contract says so.
+- The intake date in the Info form of an order: the `DateTimeField` is drawn only when
+  `order.permissions.canEditIntakeDate` is true, and `intakeDate` is sent only when the user has changed it (the
+  field is dirty); otherwise it is omitted. The native field has minute precision, so sending an untouched value
+  would cut the seconds of the stored instant.
 
 ## Infrastructure
 

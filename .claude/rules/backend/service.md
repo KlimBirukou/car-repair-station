@@ -29,6 +29,8 @@ Unless explicitly overridden by the project specification:
   mappers outside the service. Assembling a domain object from a DTO (ID, defaults, preserved immutable fields) is
   use-case logic and stays in the service, with the builder.
 - **Create:** Validate required relations → generate ID → assemble domain object → `insert` → log successful creation.
+- **Business number:** A number from a sequence is taken by the service from the port (`nextNumber()`), like an id,
+  before the domain object is built. Mappers, adapters and entities never assign it.
 - **Update (PUT, standalone entities; the root of an aggregate has commands instead, see the Aggregates rule):** Verify
   the target exists → validate required relations → assemble the new domain object from the existing one and the mutable
   DTO fields (ID and immutable fields unchanged) → `update` → log successful update. The ID is a separate parameter, not
@@ -37,11 +39,14 @@ Unless explicitly overridden by the project specification:
 - **Write:** `@Transactional`.
 - **Lists:** Accept a filter record and `Pageable`, return `Page` (see the Pagination rule).
 - **Guarding a rule across several rows:** An operation whose rule depends on more than one row (an employee must not
-  deactivate themselves; at least one active manager must stay) locks the rows it checks inside the transaction with a
-  pessimistic write lock, in ascending id order so that two such operations cannot deadlock. After taking the locks it
-  checks the rule again on the fresh data and writes. `@Version` alone does not protect it: two requests that change two
-  different rows both pass the version check. The repository port has a method for this (for example
-  `findAllByIdForUpdate(ids)`); the adapter implements it with `@Lock(LockModeType.PESSIMISTIC_WRITE)`.
+  deactivate themselves; at least one active manager must always remain, also when a role is taken from a manager) locks
+  the rows it checks inside the transaction with a pessimistic write lock, in ascending id order so that two such
+  operations cannot deadlock. For the employee operations (deactivate, and an update that changes the role) the locked
+  rows are the target and every active manager. After taking the locks the service checks the rule again on the fresh
+  data: the own record is `EmployeeSelfChangeException`; a result without any active manager is `LastManagerException`.
+  Then it writes. `@Version` alone does not protect it: two requests that change two different rows both pass the
+  version check. The repository port has a method for this (`lockManagersAndEmployee(UUID id)`); the adapter implements
+  it with `@Lock(LockModeType.PESSIMISTIC_WRITE)`.
 - **Null contract:** Use Lombok `@NonNull` on required parameters of `*ServiceImpl` methods. Lombok inserts the check
   into a method body; on the interface it is documentation only.
 - **Errors:** Throw `BusinessException` subclasses (see the Exceptions rule). Do not catch persistence exceptions.
@@ -116,3 +121,6 @@ dependency, transaction model, mapping approach, or ID strategy.
 - Reviewer checklist: every write method is `@Transactional`, every read method is `readOnly`, every successful write
   logs once.
 - Unit tests of TextNormalizer with literals: "  A@B.com " gives "a@b.com", "" gives null.
+- Unit tests of the employee guard: the own record; the only active manager; two managers (the second request is
+  rejected after the first took the lock: the port is called once with the sorted ids); a change of role of the last
+  manager; success with another active manager.

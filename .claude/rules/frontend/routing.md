@@ -37,8 +37,9 @@ Unless explicitly overridden by the project specification:
 - **How (list or grid):**
     - A feature gives `EntityList` its items and a function that maps one record to the props of `EntityListItem`:
       `title`, `subtitle`, `badge`, `meta` (up to 4 short labelled values, wrapped on a phone), `trailing` (the key
-      amount or date), `to` (the link) and an optional `actions` (up to two 48 px buttons, see below). `EntityList`
-      draws them as rows or as cards. A feature never draws the two layouts itself.
+      amount or date), `to` (the link) and an optional `actions` (up to two 48 px buttons, see below). For an order the
+      number (`formatOrderNumber`) is the first value of `meta`. `EntityList` draws them as rows or as cards. A feature
+      never draws the two layouts itself.
     - `EntityList` has a `density` prop: `"normal"` (default) or `"large"`. `"large"` draws the large cards of "My
       orders" (`screens.md`): more of the text is shown (the problem description wraps over several lines), the
       `actions` button is 56 px, and it applies to rows and to cards alike, on a phone too. Only the "My orders" page

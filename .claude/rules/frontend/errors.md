@@ -105,6 +105,9 @@ not branch in a component.
   comes; `describeError` gives `fields` for both and the form puts the `detail` into its alert.
 - An `errors` key that matches no field of the form is shown in the form-level alert (see the Forms and Validation
   rule).
+- Rejections of employee rules (the last active manager, the own record) arrive as 409 and 403 with the backend text: a
+  toast as it comes, and the employee commands declare `meta: { invalidates: employeeKeys.all }`, so the list is
+  refetched. The client has no code for them.
 
 ## Infrastructure
 

@@ -45,6 +45,9 @@ Unless explicitly overridden by the project specification:
     - A missing, expired or invalid session → 401 with `code = error.unauthorized`, produced by the security entry point
       in the same `ProblemDetail` shape (see the Security rule).
     - Any other exception → 500, a generic text, `ERROR` log with the stack trace.
+    - Feature exceptions to the order and employee rules: `workorder/exception`: `LinesLockedException`,
+      `OrderClosedException`, `IntakeDateLockedException`; `employee/exception`: `LastManagerException`
+      (`CONFLICT`), `EmployeeSelfChangeException` (`FORBIDDEN`).
 - **Language:** The interface is English and so is `messages.properties`. The frontend shows `detail` and the `errors`
   texts as they come; it has no message dictionary.
 
@@ -83,6 +86,9 @@ field.payment-date-future=Date cannot be in the future
 field.current-password-incorrect=Current password is incorrect
 field.password-policy=Password must be 10 to 72 characters and contain a letter, a digit and a symbol
 field.reason-required=Enter a reason
+error.last-manager=At least one active manager must remain.
+error.employee-self-change=You cannot deactivate yourself or change your own role.
+error.intake-date-locked=The intake date can be changed only while the order is an appointment
 ```
 
 ```java
@@ -141,3 +147,6 @@ Adding a new `ErrorKind` requires a change in the handler. It is rare and must b
   `org.springframework.dao..` and Hibernate exception classes.
 - Unit test: every `field.<code>` used in a `FieldErrorException` has an entry in `messages.properties`.
 - Integration test: a `FieldErrorException` gives 400 with `code = error.validation` and `errors.<field>` with the text.
+- Integration tests: deactivating the last active manager and taking the role from them are rejected with 409 and the
+  text of `error.last-manager`; the own record is rejected with 403 and `error.employee-self-change`; a changed intake
+  date of an accepted order is 409 `error.intake-date-locked`.

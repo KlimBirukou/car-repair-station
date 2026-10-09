@@ -38,6 +38,9 @@ db/
       file. A changeset that needs a table from a file included later goes into the file of the later table: a fresh
       database runs the changesets in include order, an existing one runs only the new ones, and the two orders must
       agree.
+    - A sequence that numbers the rows of a table is created by the first changeset of that table's file, before the
+      table: id `create-<table>_<column>_seq-sequence` (for example `create-work_order_number_seq-sequence`). A
+      sequence is not a table: it has no file of its own.
     - Changeset ids: `create-<table>-table`, `create-fk-and-index-<table>-<ref>`, `create-check-<table>-<column>`,
       `create-uk-<table>-<column>`, later `<verb>-<table>-<object>`. Table names keep their underscores.
     - `author` is the name of the agent that wrote the changeset (`db-dev`, as the schema and the seed are its work).
@@ -61,6 +64,13 @@ db/
       String lengths are chosen by `db-dev`, reported, and mirrored by `@Size` in the requests.
     - An enum is `VARCHAR(30)` with a check constraint `ck_<table>_<column>` that lists the values.
     - Every foreign key has `onDelete: RESTRICT`, `onUpdate: RESTRICT` and an index on its column.
+    - A business number from a sequence (`work_order.number`) is `INTEGER NOT NULL` with the named unique constraint
+      `uk_work_order_number` (orders are never deleted, so there is no delete token). The sequence is named
+      `<table>_<column>_seq` (`work_order_number_seq`) and made with the structured change `createSequence`
+      (`startValue` 1, `incrementBy` 1, no `schemaName`). The column has no default: the service assigns the value (see
+      the Aggregates rule).
+    - `work_order_status_history.from_status` is nullable (empty only in the creation record). Its check constraint
+      lists the values; NULL passes a check, so the constraint stays as it is.
 - **How (portability):** Only generic Liquibase types and plain SQL. A check constraint is a `sql` change with its own
   `rollback`, and its table is written as `${schema}.<table>`. Structured changes carry no `schemaName`: the schema is
   set once in the configuration.
@@ -75,6 +85,11 @@ db/
     - Ids are fixed UUID v7 literals (see the Entity Identifiers rule). A live soft-delete row holds the constant
       `00000000-0000-0000-0000-000000000000` in `delete_token`, a deleted row holds its own id.
     - What the seed contains is defined in `docs/product/seed-data.md`.
+    - A seeded table with a sequence-numbered column has one more seed changeset after its data (`context: seed`,
+      `runOnChange: true`): `dropSequence` and `createSequence` with a `startValue` above the highest seeded number
+      (`work_order_number_seq`: seeded numbers 1001 and up, `startValue` 2001). So the first order created in
+      development gets a number above the seeded ones. `db-dev` names the highest seeded number in the report. The
+      development database is in memory, so recreating the sequence on a re-run loses nothing.
 - **How (contexts):** Every profile sets `spring.liquibase.contexts` explicitly, because without a context Liquibase
   runs all changesets, the seed included: `dev` → `seed`, `test` → `test` (matches nothing), any other profile → `prod`.
 - **How (freeze):** The schema and the seed are built first and shown to the human. Until the human records "Schema
@@ -215,3 +230,5 @@ names differently. The changelogs stay as they are.
   name starts with `pk_`, `fk_`, `uk_`, `idx_` or `ck_`; no id is repeated.
 - Reviewer checklist: file-per-table, the include order, explicit names, a `rollback` on every `sql` change,
   `context: seed` on every seed changeset, no item from Prohibitions.
+- `ChangelogPortabilityTest` (context `seed`): the next value of `work_order_number_seq` is greater than the highest
+  seeded `work_order.number`; the sequence is created on H2 by `createSequence` only (no database-specific SQL).

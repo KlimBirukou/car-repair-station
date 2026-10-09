@@ -26,6 +26,8 @@ Unless explicitly overridden by the project specification:
     - Other numbers: `parseInteger(text)` (year, mileage: digits only, no sign), `parseHours(text)` (`standardHours`, up
       to 2 decimals), `formatHours(1.5)` gives `1.5`, `formatInteger(120000)` gives `120,000` (mileage). A count or a
       page number is shown with `String(n)`.
+    - `formatOrderNumber(1001)` gives `#1001`: the sign and the plain digits, never grouped (an order number is an
+      identifier, not a quantity: not `formatInteger`).
 - **How (time):**
     - `STATION_TIME_ZONE = 'Asia/Tbilisi'` is one constant in `shared/format/zone.ts` (it equals the backend's
       `app.station-time-zone`).
@@ -119,3 +121,4 @@ The specification may require another currency or another format. Follow it in t
 - Test that every `OrderStatus` has a label and a badge style.
 - `npm run lint` fails on every item of Prohibitions.
 - `formatInstantTime('2026-10-04T21:30:00Z')` → `01:30`;
+- `formatOrderNumber(1001)` → `#1001`;

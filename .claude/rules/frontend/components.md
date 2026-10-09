@@ -112,6 +112,9 @@ and Touch rule. Wrap it once in `shared/` at 48 px and use the wrapper.
 - A component that shows money, a date or a status takes the raw value and calls `formatMoney`, `formatDate` or
   `StatusBadge` itself; a parent never passes a formatted string.
 - A skeleton or shimmer is not used while loading (the Theme rule); a `Spin` after 300 ms is.
+- A history item draws the from-badge and the arrow only when `fromStatus` is not null (the creation record has none):
+  the component decides from the data it is given. The order number is shown wherever `screens.md` names it, always
+  through `formatOrderNumber`.
 
 ## Infrastructure
 

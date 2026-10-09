@@ -28,6 +28,10 @@ Unless explicitly overridden by the project specification:
       Identifiers rule).
     - A line may be added, changed or removed only while `status.linesEditable()` is true (see the Status Transitions
       rule). The service checks it before it builds the new root.
+    - The root has `number` (integer): the order number shown to people. It is assigned once, by the service, from
+      the sequence through the port (`nextNumber()`), and never changes: the entity field has
+      `@Setter(AccessLevel.NONE)` and `updatable = false`, `updateEntity` does not touch it, no request carries it.
+      A rolled-back transaction leaves a gap in the numbers; a number is never reused.
 - **How (persistence):**
     - The root entity maps its children with a unidirectional `@OneToMany(cascade = ALL, orphanRemoval = true)`,
       `@JoinColumn(name = "<root>_id", nullable = false, updatable = false)` and `@BatchSize(size = 50)`. The field has
@@ -43,7 +47,8 @@ Unless explicitly overridden by the project specification:
 - **How (commands):** The root has no single `PUT`. There is one operation per screen section. Each has its own request
   type, its own rights check and carries the expected `version`. Each returns the full order with the new `version` (a
   delete returns the order too, not 204).
-    - `PUT /{id}/info` (problem description, mileage), `PUT /{id}/diagnostic-notes`, `PUT /{id}/mechanic`.
+    - `POST /` creates an order (`MANAGER`), `PUT /{id}/info` (problem description, mileage and the optional
+      `intakeDate`: omitted means unchanged), `PUT /{id}/diagnostic-notes`, `PUT /{id}/mechanic`.
     - `POST /{id}/lines`, `PUT /{id}/lines/{lineId}`, `DELETE /{id}/lines/{lineId}`.
     - `POST /{id}/payments`, `POST /{id}/transitions` (see the Status Transitions rule).
     - Reads: `GET /{id}` (order with lines and transitions; for a cancelled order also `cancellation`: the reason, the
@@ -55,16 +60,27 @@ Unless explicitly overridden by the project specification:
   mechanic: `OrderClosedException`; `linesEditable()` for lines: `LinesLockedException`) → build the new root →
   `update` → write dependent records through their ports in the same transaction → log. `expectedVersion` is a separate
   parameter next to the id.
+    - **Create:** check that the customer and the vehicle exist and are not deleted (and the mechanic, if given, is
+      active) → generate the id (`IdGenerator`) → take the number from the port (`nextNumber()`) → build the root in
+      `APPOINTMENT` → `insert` → write the creation history record through the history port (`fromStatus` `null`,
+      `toStatus` `APPOINTMENT`, the user, `changedAt` from the injected `Clock`, no comment) → log. One transaction.
+    - **Intake date:** a command with an `intakeDate` that differs from the stored one is allowed for `MANAGER` only
+      while `status.allowsIntakeDateChange()` is true; otherwise `IntakeDateLockedException` (`CONFLICT`,
+      `error.intake-date-locked`) and nothing is written.
+    - **Vehicle mileage:** when an order's `mileage` is set or changed (or its `intakeDate` moves), the service asks
+      the order port `existsLaterOrderWithMileage(vehicleId, intakeDate, excludeOrderId)`. If the answer is no (an
+      order with an equal date does not count as later), it calls `VehicleService.updateMileage(vehicleId, mileage)`
+      in the same transaction. If yes, the vehicle is not touched. A cleared mileage never changes the vehicle.
 - **How (permissions):** The order response carries `permissions`, a record of booleans computed by the service from
   `CurrentUser`, the order, the payments and the total, in one method (`OrderPermissions`): `canEditInfo` (problem
-  description and mileage: `MANAGER`, and `status.isOpen()`), `canEditNotes` (own order or `MANAGER`, and
-  `status.isOpen()`), `canAssignMechanic` (`MANAGER`, and `status.isOpen()`), `canEditLines` (own order or `MANAGER`,
-  and `status.linesEditable()`), `canRecordPayment` (`MANAGER`, `status.acceptsPayment()`, no payment yet, and a total
-  above zero: `Payment.amount` must be greater than 0, so an order with a zero total goes to `PAID` without a payment).
-  The values follow `docs/domain/operations.md`, with the limit of `isOpen()` as a default until the human writes it
-  into that file. Next to it the response carries `linesEditable`, the status rule alone (it drives the note "Lines are
-  locked"). The frontend draws what these flags say and keeps no table of rights. Mutating endpoints still check the
-  same rights: a flag is a hint, the command is the guard.
+  description and mileage: `MANAGER`, and `status.isOpen()`), `canEditIntakeDate` (`MANAGER`, and
+  `status.allowsIntakeDateChange()`), `canEditNotes` (own order or `MANAGER`, and `status.isOpen()`),
+  `canAssignMechanic` (`MANAGER`, and `status.isOpen()`), `canEditLines` (own order or `MANAGER`, and
+  `status.linesEditable()`), `canRecordPayment` (`MANAGER`, `status.acceptsPayment()`, no payment yet, and a total above
+  zero: `Payment.amount` must be greater than 0, so an order with a zero total goes to `PAID` without a payment). The
+  values follow `docs/domain/operations.md`. Next to it the response carries `linesEditable`, the status rule alone (it
+  drives the note "Lines are locked"). The frontend draws what these flags say and keeps no table of rights. Mutating
+  endpoints still check the same rights: a flag is a hint, the command is the guard.
 - **Lists:** A list row carries the order total, `version` and `transitions`, so that a command can be sent from a row
   (Today, My orders) with the version the user saw. The adapter loads the lines in batches (`@BatchSize`) and never with
   a fetch join of the collection in a paged query. The payments of the page come from one call of `findAllByOrderIds`,
@@ -127,6 +143,7 @@ The specification may declare another shape of aggregate or ask for a stored der
 - No fetch join of a collection in a paged query.
 - No change of a child outside the root's commands.
 - No `version` taken from a request except as the expected version.
+- No order number from a request, no `max(number) + 1`, no change of `number` after the insert.
 
 ## Special Cases
 
@@ -138,7 +155,8 @@ The specification may declare another shape of aggregate or ask for a stored der
 
 - Hibernate `@BatchSize`; Spring Data `@Lock` and `@Query`.
 - `ConcurrentUpdateException` in `common/exception` (`CONFLICT`, `error.concurrent-update`).
-- `OrderClosedException` в `workorder/exception` (`CONFLICT`, `error.order-closed`).
+- `OrderClosedException` in `workorder/exception` (`CONFLICT`, `error.order-closed`).
+- `IntakeDateLockedException` in `workorder/exception` (`CONFLICT`, `error.intake-date-locked`)
 
 ## Verification
 
@@ -155,3 +173,11 @@ The specification may declare another shape of aggregate or ask for a stored der
   `OrderPermissions` for the manager, the own mechanic and another mechanic in `READY`, `CLOSED`, `CANCELLED` with and
   without a payment, every flag written out as a literal.
 - If the version test fails, fix the mechanism, not the test.
+- Unit tests: create assigns the id and the number from the mocked port and writes the creation history record with
+  `fromStatus` `null`; a changed `intakeDate` in a status other than `APPOINTMENT` throws and writes nothing; an
+  omitted `intakeDate` changes nothing; the vehicle mileage is updated only when `existsLaterOrderWithMileage` is
+  false, and never for a cleared mileage; `OrderPermissions` has `canEditIntakeDate` written out for `APPOINTMENT`
+  and every other status.
+- Integration test (H2): two orders created one after another get different, increasing numbers; the number is the same
+  after an update; a request with a number field is ignored; the number sequence works the same through the adapter
+  after the seed.

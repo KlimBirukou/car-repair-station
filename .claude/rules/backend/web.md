@@ -74,7 +74,8 @@ Unless explicitly overridden by the project specification:
       `errors` (a map from a field to its text).
     - The customizer sets `operationId` to `<controller><Method>` (`customerFindAll`), so every id is unique.
     - Every component of a response record is `@NotNull` (required) or `@Schema(nullable = true)`. Money is `BigDecimal`
-      (`number`), an instant is `Instant` (`date-time`).
+      (`number`), an instant is `Instant` (`date-time`), `number` of an order is required; `fromStatus` of a history
+      record is nullable.
     - Swagger UI and `/v3/api-docs` are enabled only in `dev` and `test`. `OpenApiExportTest` writes the document to
       `backend/openapi/openapi.json` with sorted keys; the file is committed.
 

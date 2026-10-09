@@ -90,10 +90,15 @@ The specification may require a different persistence approach for an entity. Fo
 
 ## Special Cases
 
-LIKE filters are case-insensitive: compare `lower(column)` with a lower-cased `%value%` pattern.
-A dependent record (see the Aggregates rule) has `findAllBy<Parent>Id(UUID)` for one parent and
-`findAllBy<Parent>Ids(Set<UUID>)` for a page of parents (one query, returns a `List`; the service groups it). They are
-the only exceptions to "lists through `findAll(filter, pageable)`".
+- LIKE filters are case-insensitive: compare `lower(column)` with a lower-cased `%value%` pattern.
+  A dependent record (see the Aggregates rule) has `findAllBy<Parent>Id(UUID)` for one parent and
+  `findAllBy<Parent>Ids(Set<UUID>)` for a page of parents (one query, returns a `List`; the service groups it). They are
+  the only exceptions to "lists through `findAll(filter, pageable)`".
+- A number from a database sequence (`nextNumber()` of the order port) is the one place where an adapter uses the
+  `EntityManager`: the adapter takes the dialect of the Hibernate session factory and asks it for the "next value"
+  statement of the sequence, so the same code runs on H2 and PostgreSQL. No hand-written `nextval`, `NEXT VALUE FOR` or
+  `select … from dual`. The first order task proves it on H2 with an integration test (the second call returns a larger
+  number).
 
 ## Infrastructure
 
@@ -108,3 +113,4 @@ Spring Data JPA: `JpaRepository` and `JpaSpecificationExecutor`.
   them.
 - `findAllByIds` and `findAllBy<Parent>Ids` run one query for any number of ids (statement count in the integration
   test).
+- No sequence statement written for one database.

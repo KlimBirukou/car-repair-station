@@ -29,6 +29,7 @@ Unless explicitly overridden by the project specification:
 | which transition buttons exist and which are enabled                                                        | `order.transitions` (and `transitions` of a list row)                                                                                                                                          |
 | are the lines locked (the note "Lines are locked")                                                          | `order.linesEditable`                                                                                                                                                                          |
 | may the user see a field                                                                                    | the field arrives as `null` when not (`Part.purchasePrice`)                                                                                                                                    |
+| may the user move the appointment (the intake date and time of an order)                                    | `order.permissions.canEditIntakeDate`                                                                                                                                                          |
 
 - **How (menu):** `menu.ts` maps each value of `capabilities.menu` to its label (from `strings`), icon and route. The
   tab bar and the side menu draw the list in the order the backend gave it. After a login the user goes to the first
@@ -56,6 +57,9 @@ Unless explicitly overridden by the project specification:
     - A column or a line for a field that arrives as `null` is not drawn. The code never asks whether the user is a
       manager.
     - A list the mechanic sees is already narrowed by the backend.
+    - The Info section of an order is edited field by field from the flags `canEditInfo`, `canEditIntakeDate` and
+      `canEditNotes`. In a `CLOSED` or `CANCELLED` order all of them are false (the backend decides), so the section
+      shows text only, and the frontend has no status check for it.
 - **How (current user):** The role changes at once on the backend. `useCurrentUser` refetches on window focus, so a
   changed role or a deactivation reaches the UI the next time the screen is used. The name and the role are shown in the
   user menu as text from the response; they decide nothing.
@@ -115,3 +119,4 @@ client is regenerated), then read it here.
 - Reviewer checklist: search for the role literals and for status names. Status literals are allowed in exactly three
   places: `shared/theme/StatusBadge`, `shared/strings/status.ts` and `features/workorder/filters.ts` (the status sets of
   the "Active" tab, the board columns and Today, typed `OrderStatus[]`).
+- Component test: canEditIntakeDate: false draws the intake date as text, true draws the date-and-time field.

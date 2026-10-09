@@ -77,7 +77,8 @@ Unless explicitly overridden by the project specification:
   menu, the tab bar, the top bar, the action bar, the banners, every button and the history section; the shared layout
   components set it themselves). The sheet hides `[data-print="hide"]`, sets a white background and black text, and lets
   the order card use the full width. What stays: the header, the customer, the vehicle, the lines, the total and the
-  payment (`screens.md`). The Print button calls `window.print()`.
+  payment (`screens.md`). The Print button calls `window.print()`. The order number is in the header, so it is printed;
+  it is the number the customer sees on the invoice.
 - **How (default theme):** There is one light theme. The default blue of antd never shows: the primary color, the link
   color, the focus color and the selected color all come from the tokens.
 
