@@ -2,20 +2,26 @@
 paths:
   - "backend/src/**/*.java"
 ---
+
 # Rule: Package Structure
 
 ## Default
+
 Unless explicitly overridden by the project specification:
 
 - **What:** Package-by-feature. Each feature has one top-level package with the same internal layout.
 - **When:** For every new feature (aggregate).
-- **Where:** `<base>/<feature>/`; `<base>` is `com.carrepair.station`. Shared code lives in `<base>/common/` (`common/exception`, `common/web`, `common/service`, `common/security` with `CurrentUser`, `Role`, `PasswordPolicy` and `PasswordHasher`, `common/persistence` with `SoftDelete`).
+- **Where:** `<base>/<feature>/`; `<base>` is `com.carrepair.station`. Shared code lives in `<base>/common/`
+  (`common/exception`, `common/web`, `common/service`, `common/security` with `CurrentUser`, `Role`, `PasswordPolicy`
+  and `PasswordHasher`, `common/persistence` with `SoftDelete`).
 - **How:** Use this layout. Create only the parts the feature needs.
 
 ```text
 <feature>/
 ├── <Feature>.java                  # domain record
 ├── <Feature>Filter.java            # domain filter record for list queries
+├── <Feature>Ref.java               # small reference record for other features' responses
+├── <Feature>View.java              # composite read model built by the service (optional)
 ├── exception/                      # feature-specific business exceptions
 ├── service/
 │   ├── <Feature>Service.java
@@ -40,32 +46,56 @@ Unless explicitly overridden by the project specification:
     └── <Feature>WebMapper.java
 ```
 
-- **Dependencies:** `web` → `service` → `repository` (port) ← `repository.jpa`. Domain records in the feature root may be used by every layer. The port never depends on `repository.jpa`.
-- **Cross-feature:** A feature may use another feature's domain records, repository port (for example `existsById`) and service interface. It must not use another feature's `repository.jpa`, `*ServiceImpl` or `web` package.
-- **Deletion guards:** A feature that must refuse an operation because of data it does not own (a customer is not deleted while a vehicle or an open order refers to it) declares a guard port in its own feature root, for example `CustomerDeletionGuard`, with one method that returns the reason or nothing. The features that own the data (`vehicle`, `workorder`) implement the port in their `service` package. The guarded feature depends only on its own port, so there is no cycle. Its service calls every guard and throws the first reason as a `CONFLICT`. Until a feature that owns the data exists, there is no implementation for it.
+- **Dependencies:** `web` → `service` → `repository` (port) ← `repository.jpa`. Domain records in the feature root may
+  be used by every layer. The port never depends on `repository.jpa`.
+- **Cross-feature:** A feature may use another feature's domain records, repository port (for example `existsById`) and
+  service interface. It must not use another feature's `repository.jpa`, `*ServiceImpl` or `web` package. Data of
+  another feature that a response shows goes through its `Ref` and `findRefsByIds`, and a count through a counter port
+  in the root of the feature that needs it (see the References rule).
+- **Deletion guards:** A feature that must refuse an operation because of data it does not own (a customer is not
+  deleted while a vehicle or an open order refers to it) declares a guard port in its own feature root, for example
+  `CustomerDeletionGuard`, with one method that returns the reason or nothing. The features that own the data
+  (`vehicle`, `workorder`) implement the port in their `service` package. The guarded feature depends only on its own
+  port, so there is no cycle. Its service calls every guard and throws the first reason as a `CONFLICT`. Until a feature
+  that owns the data exists, there is no implementation for it.
 - **Visibility:** Everything in `repository.jpa` is package-private. The rest is public.
-- **Naming:** Package names are lowercase without underscores (`workorder`, not `work_order`). `<Feature>` is the name of the feature or aggregate.
+- **Naming:** Package names are lowercase without underscores (`workorder`, not `work_order`). `<Feature>` is the name
+  of the feature or aggregate.
 
 ## Why
+
 - A new class has exactly one place, so generated code looks the same in every feature.
 - Package-private persistence types make the compiler stop JPA from leaking into services and controllers.
 - One-way dependencies keep features independent and testable.
 
 ## Exceptions
-The specification may define a shared module used by several features. Put it in `common/` or in its own top-level package and follow the specification.
+
+The specification may define a shared module used by several features. Put it in `common/` or in its own top-level
+package and follow the specification.
 
 ## Prohibitions
+
 - No layer-first packages (`controllers/`, `services/`, `repositories/`) and no `util` dumping ground.
 - No `facade` layer and no `repository/domain` package.
 - No `public` on classes in `repository.jpa`.
 - No cycles between features.
 
 ## Special Cases
-A non-standalone entity lives in the package of its parent feature, and only when the specification says it is not standalone (see the Aggregates rule). There are two kinds:
-- **Owned child** (an order line): a domain record nested in the root record and a package-private JPA entity in `repository.jpa`. No port, no service, no web package of its own.
-- **Dependent record** (a payment, a status history record): a domain record in the feature root, its own port in `repository/` and adapter in `repository/jpa/`. No service and no web package of its own; its logic lives in the parent's service. It refers to the parent by id.
-- A feature that wires a framework (the `auth` feature with Spring Security) may have a `security/` package for that wiring. The dependency directions stay the same.
+
+A non-standalone entity lives in the package of its parent feature, and only when the specification says it is not
+standalone (see the Aggregates rule). There are two kinds:
+
+- **Owned child** (an order line): a domain record nested in the root record and a package-private JPA entity in
+  `repository.jpa`. No port, no service, no web package of its own.
+- **Dependent record** (a payment, a status history record): a domain record in the feature root, its own port in
+  `repository/` and adapter in `repository/jpa/`. No service and no web package of its own; its logic lives in the
+  parent's service. It refers to the parent by id.
+- A feature that wires a framework (the `auth` feature with Spring Security) may have a `security/` package for that
+  wiring. The dependency directions stay the same.
 
 ## Verification
-- ArchUnit: layer dependencies as above; `repository.jpa` classes are not public; the port package does not depend on `repository.jpa`.
-- ArchUnit: features are free of cycles; no feature depends on another feature's `repository.jpa`, `*ServiceImpl` or `web`.
+
+- ArchUnit: layer dependencies as above; `repository.jpa` classes are not public; the port package does not depend on
+  `repository.jpa`.
+- ArchUnit: features are free of cycles; no feature depends on another feature's `repository.jpa`, `*ServiceImpl` or
+  `web`.
