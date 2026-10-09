@@ -6,27 +6,22 @@ Internal web CRM for one car service station. It replaces Excel and paper logs: 
 services, parts, payments. Users are employees only (`MANAGER`, `MECHANIC`); a customer is a record, not a user. All
 work is recorded in the system, including walk-in customers and towed vehicles.
 
-## Current phase: planning only
+## Current phase: backend-only build run
 
-The project is in the discussion and planning phase. This section overrides every other instruction in this file, in
-`backend/CLAUDE.md`, in `frontend/CLAUDE.md`, in the agent definitions and in `.claude/settings.json`. It stays in force
-until the human removes it.
-
-Forbidden until then:
-
-- Fetching or installing anything for the application: `./gradlew`, `gradle`, `npm`, `npx`, `npm create`, downloads from
-  Spring Initializr or similar services.
-- Running, building or testing the application, including the gates `./gradlew check` and `npm run check`.
-- Creating or changing anything in `backend/` and `frontend/` except their `CLAUDE.md`: build files, wrappers, configs,
-  sources, changelogs, the OpenAPI file, the generated client, any generated code.
-- Starting the `planner`, `db-dev`, `backend-dev`, `frontend-dev` and `orchestrator` agents and the `plan` and
-  `evaluate-plan` skills. The `reviewer` runs only when the human asks.
-- Creating new skills, connecting MCP servers or Context7, adding tools.
-
-Allowed: reading files, answering questions, discussing the plan and the technical questions, and editing the files the
-human names or permits.
-The rules "a task is done only when the gate is green" and the workflow below apply after this section is removed. Git
-(commits, pushes) is done by the human.
+This section overrides every other instruction in this file, in the area `CLAUDE.md` files, in the agent definitions and
+in `.claude/settings.json`. It stays in force until the human removes it.
+Allowed: the whole workflow below for `backend/` (schema, seed, application): the `orchestrator`, `planner`, `db-dev`,
+`backend-dev` and `reviewer` agents, `./gradlew`, downloading the backend dependencies. There is no Node and no
+Context7 on this machine: hooks and MCP servers are not used; library names and versions come from the dependency
+management of Spring Boot 4.0.5 and the resolved jars.
+Forbidden: everything about the frontend. Do not start `frontend-dev`; do not create or change anything in `frontend/`
+except its `CLAUDE.md`; no `npm`, `npx`, `npm run check`, browser tests or generated client. The plan, its review and
+the
+final review cover the backend only: the absence of frontend tasks and screens is not a coverage gap. The plan
+contains no frontend task. Every brief to a subagent says "backend-only run".
+The project skeleton of the backend (build files, wrapper, application class, `application*.yaml`,
+`db/init/create-schema.sql`) is the first task and the one backend task allowed before the schema stage.
+Git (commits, pushes) is done by the human.
 
 ## Sources of truth (WHAT)
 
