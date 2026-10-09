@@ -19,7 +19,7 @@ The brief names your mode: `plan` or `revise`.
 `TASK.md`, then `docs/product/scope.md`. Inspect the repository (`Glob` the tree, read the area `CLAUDE.md` files) to
 see what already exists. Then read the WHAT files the work needs: `docs/domain/entities.md`, `work-order-lifecycle.md`
 and `operations.md`, and `docs/product/screens.md`, `ui-style.md` and `seed-data.md`. Read `docs/decisions.md`. Where
-`TASK.md` and `docs/` differ, `docs/` wins.
+TASK.md and docs/ differ, docs/ wins; where docs/ and the Log of docs/decisions.md differ, the Log wins.
 
 ## Mode `plan`
 

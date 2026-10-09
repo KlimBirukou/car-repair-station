@@ -32,6 +32,8 @@ The rules "a task is done only when the gate is green" and the workflow below ap
 
 Read the relevant file before working on a task. Paths are in backticks on purpose: do not import them.
 
+- `docs/decisions.md` — the log of decisions and the highest authority. A concrete directive in its Log beats any other
+  file; see "Working with requirements". Maintained by the human: read it, never edit it.
 - `docs/product/scope.md` — what is in scope, postponed and out of scope. Read first.
 - `docs/domain/entities.md` — entities, fields, types, uniqueness, deletion, validation.
 - `docs/domain/work-order-lifecycle.md` — order statuses and who may move between them, with conditions.
@@ -41,18 +43,23 @@ Read the relevant file before working on a task. Paths are in backticks on purpo
 - `docs/product/seed-data.md` — the data the system starts with.
 - `docs/product/original-requirements.md` — the original assignment; where it differs from the files above, they win.
 - `TASK.md` (repository root) — the entry description of the product for the planner: flows, acceptance criteria,
-  constraints. It summarizes the files above; where it differs from them, they win.
-- `docs/decisions.md` — log of decisions and their reasons. Maintained by the human: read for context, do not edit.
+  constraints. It summarizes the files above; where it differs from them, they win, and the Log of docs/decisions.md
+  wins over both.
 
 ## Working with requirements
 
+- Order of authority: the Log of `docs/decisions.md`; then `docs/domain/` and `docs/product/`; then `TASK.md`; then the
+  rules, the `CLAUDE.md` files and the agent definitions. Where two files disagree or a rule is missing, first look for
+  the topic in the Log (Grep). A concrete directive there is the truth, whatever the other files say: a mismatch means
+  the other file was not updated. Follow it, and report the mismatch ("Resolved by D-0xx"). If the entries disagree, the
+  newest wins. A topic on the Open list is undecided: stop.
 - The files above are the human's decisions. Do not edit them without explicit permission.
 - If a rule is missing or two files conflict, do not guess silently. Stop and report when the question touches the Open
   list in `docs/decisions.md`, anything postponed or out of scope, money, rights and roles, deleting data, or a schema
   change after "Schema frozen". Otherwise take the most conservative reading, continue, and list it as an assumption in
   your report; the orchestrator records it in `context/PLAN.md`.
 - Do not implement anything listed as postponed or out of scope.
-- If code and docs disagree, the docs win; report the mismatch.
+- If code and docs disagree, the docs win; if the docs and the Log disagree, the Log wins. Report the mismatch.
 
 ## Invariants (never break; details are in the files above)
 

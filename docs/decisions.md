@@ -1,21 +1,40 @@
 # Decisions
 
-Log of decisions made by the human, with the reasons. Newest first. Agents read it for context and do not edit it. A
-decision that changes a requirement is also written into the matching file under `docs/domain/` or `docs/product/`.
+The log of decisions made by the human, with the reasons. Newest first. Agents read it and never edit it. A decision
+that changes a requirement is also written into the matching file under `docs/domain/` or `docs/product/`.
+
+## Authority
+
+This file is the highest authority of the project.
+
+- Order of authority: the Log below; then `docs/domain/` and `docs/product/`; then `TASK.md`; then the rules in
+  `.claude/rules/`, the `CLAUDE.md` files and the agent definitions.
+- A concrete directive in the Log beats any other file. A disagreement means that the other file was not updated yet.
+  Until the human corrects it, the Log is the truth.
+- If two entries disagree, the newest wins. An entry marked "replaced" does not count. The reason and the rejected
+  alternatives of an entry are not directives.
+- A topic on the Open list is not decided: a run that needs it stops and reports, it does not guess.
 
 ## Open
 
 Not decided yet. A run that needs one of these must stop and report it, not guess.
 
-- Who writes work items and tasks, and whether the human approves the split before a run. The agreed shape is two
-  levels: broad work items from the human, concrete tasks from the agents. (The planner writes the tasks since D-051;
-  whether the human approves the split before a run is still open.)
-- MCP servers (Context7, Playwright) are not connected and no other skills are created (D-051 declared `plan` and
-  `evaluate-plan`).
 - Rules not written yet: the domain records rule.
-- The frontend rules need current library documentation (Context7); it is not connected yet. Until it is, a worker
-  checks the API of each pinned library in its installed typings and release notes, and reports what it could not
+- MCP servers (Context7, Playwright MCP) are not connected and no other skills are created (D-051 declared `plan` and
+  `evaluate-plan`). The browser tests are Playwright code, not MCP (D-034).
+- Library documentation (Context7) is not connected. Until it is, a worker takes the exact names and versions of a
+  pinned library from the pinned dependencies (backend: the dependency management of Spring Boot 4.0.5 and the
+  classes of the resolved jars; frontend: the installed typings and release notes), and reports what it could not
   confirm.
+- Finding an order by its number: the order list filters (`entities.md`, `screens.md`) and the global search do not
+  include the number (D-063). Whether to add a filter and a group of orders to the search is not decided.
+- Process points to settle before the run:
+    - how the `reviewer` sees the diff of one task while the human commits only after the run (without a commit between
+      tasks, `git diff` is cumulative);
+    - when "Schema frozen" is recorded: after the schema stage as now, or after the first vertical slice that proves
+      the mapping with `ddl-auto=validate`;
+    - step 5 of the orchestrator loop says "start no backend task before the freeze", but the skeleton of the backend
+      is needed earlier; the wording must say that the skeleton is the exception.
 
 ## Format
 
@@ -29,6 +48,188 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 ## Log
 
+### D-074 The lifecycle document is a reconstruction (2026-10-09)
+
+- **Decision:** The original of `docs/domain/work-order-lifecycle.md` was lost (the uploaded copy contained the
+  Operations document), and the text was reconstructed from the other documents. The human searched the git history
+  and did not find the original. A final consistency pass over the lifecycle, the operations, the entities, the screens
+  and the state-machine rule is done after all edits and before the plan is built.
+- **Reason:** The lifecycle is the core document; a distortion in it would spread into the table of transitions, the
+  tests and the screens.
+- **Alternatives rejected:** trusting the reconstruction without a check.
+- **Affects:** `docs/domain/work-order-lifecycle.md`, `state-machine.md`.
+
+### D-073 The plan files are reset; `task.md` is renamed (2026-10-09)
+
+- **Decision:** `context/PLAN.md` is an empty skeleton and `context/PLAN_REVIEW.md` is deleted: the old plan and its
+  review were written before the changes of 2026-10-09 (order number, creation record, read-only closed orders and the
+  rules below). The plan is built again. `docs/product/task.md` is renamed `docs/product/original-requirements.md`, so
+  that it is not confused with `TASK.md`.
+- **Reason:** A review of an old plan would send the planner to fix findings that no longer apply.
+- **Alternatives rejected:** revising the old plan.
+- **Affects:** `context/`, root `CLAUDE.md`, `TASK.md`.
+
+### D-072 The Log is the highest authority (2026-10-09)
+
+- **Decision:** A concrete directive in the Log of this file beats `docs/`, `TASK.md`, the rules, the `CLAUDE.md` files
+  and the agent definitions. When a worker meets a contradiction, it looks for the topic in the Log first. The
+  orchestrator applies the same rule to what the workers report: it passes the directive to the worker in the new
+  brief, notes "Resolved by D-0xx" in the task and lists the file that disagrees under "Files to fix" in the run
+  summary, so that the human corrects it. Without a directive, the old rule holds: a topic on the Open list or in one of
+  the five stop areas (D-043) stops the task; anything else is a conservative assumption. Agents never edit this file;
+  the orchestrator proposes the text of an entry when an answer of the human should become a rule.
+- **Reason:** The decisions are made in conversation and reach the files with a delay or not at all. One place has to be
+  true at any moment.
+- **Alternatives rejected:** the files of `docs/` as the only truth (a forgotten edit stops a run for a settled
+  question); the worker deciding alone which of two files is right.
+- **Affects:** this file, root `CLAUDE.md`, `.claude/agents/orchestrator.md`, `planner.md`, `reviewer.md`, `TASK.md`.
+
+### D-071 The orchestrator is the main session; the planner is its subagent (2026-10-09)
+
+- **Decision:** A run is one long session, `claude --agent orchestrator`. The orchestrator starts the `planner` (modes
+  `plan` and `revise`) and the `reviewer` in plan review mode, saves `context/PLAN_REVIEW.md`, shows the plan to the
+  human and, after the confirmation, hands the tasks to the workers one at a time. The planner, the workers and the
+  reviewer are short-lived: each starts with a clean context, does one job and ends. A subagent cannot ask the human, so
+  the orchestrator asks, in the chat, one message per question. The state of the run lives in `context/PLAN.md`, so a
+  new session can continue where the old one stopped. The tool `Write` is added to the orchestrator for `context/`
+  only. The skills `plan` and `evaluate-plan` stay as a manual way to do the same steps. This amends D-042 and D-051.
+  The human approves the plan before the run, and the planner writes the tasks; this closes the old open question about
+  who writes the tasks.
+- **Reason:** One agent that keeps the whole picture, asks the human and hands out the work; the short-lived agents keep
+  the long reading of documents and code out of its context.
+- **Alternatives rejected:** a long-lived planner that also runs the workers (mixed rights, a long context, and the
+  planner would need the Agent tool); planning only through the human's skills.
+- **Affects:** `.claude/agents/orchestrator.md`, root `CLAUDE.md`, `.claude/skills/`.
+
+### D-070 The browser tests start the backend (2026-10-09)
+
+- **Decision:** `playwright.config.ts` has two `webServer` entries: the Vite dev server and the backend
+  (`./gradlew bootRun`, profile `dev`, waits for `/v3/api-docs`, about 180 s), both with `reuseExistingServer`. An agent
+  may run `npm run e2e`; it never edits files in `backend/` for it. `npx playwright install chromium` is done by the
+  human. The "other mechanic's order by link" flow reads the id of such an order through the API as a manager, so it
+  does
+  not depend on literals of the seed.
+- **Reason:** `frontend-dev` has no other way to run the flows, and the seed makes the stack known.
+- **Alternatives rejected:** the human starts the backend by hand before every run.
+- **Affects:** `e2e.md`, `.claude/agents/frontend-dev.md`.
+
+### D-069 Backend rules: references, field errors, status predicates, batch ports (2026-10-09)
+
+- **Decision:**
+    - A response names another entity through a small `Ref` record of the owning feature and the service method
+      `findRefsByIds` (new rule `references.md`). Deleted and inactive records are returned, with their marks. A count
+      that a `Ref` cannot carry uses a counter port, for example `CustomerVehicleCounter`. Cards have no composite
+      endpoint: the vehicle filter has `customerId`, the order filter has `customerId` and `vehicleId`.
+    - `GET /employees/mechanics` returns the active mechanics as `EmployeeRef` (D-058), unpaged.
+    - A check that annotations cannot express (the year limit, the payment date, the current password, a blank reason)
+      throws `FieldErrorException` and returns the same `errors` map as Bean Validation.
+    - `WorkOrderStatus` owns the predicates `linesEditable()`, `isOpen()`, `acceptsPayment()`,
+      `allowsIntakeDateChange()` and the set `open()`. The 14 rows of the transition table have literal ids in
+      `state-machine.md`.
+    - Ports have `findAllByIds`; a dependent record has `findAllBy<Parent>Ids`, so a page of orders costs a fixed number
+      of queries.
+    - `TextNormalizer` trims and changes the case; a blank optional email becomes `null`.
+    - The order number comes from a database sequence through the dialect of the session factory, never a statement for
+      one database (D-063).
+    - Types and checks of `standardHours`, `year`, `mileage` and prices are fixed in `liquibase.md`.
+    - Until Context7 is connected, the exact artifacts and versions come from the dependency management of Spring Boot
+      4.0.5 and the resolved jars. The first backend task must prove that `OpenApiExportTest` writes
+      `backend/openapi/openapi.json` on Spring Boot 4, Jackson 3 and springdoc, before anything is built on it.
+- **Reason:** Closes the gaps found in the consistency check: the cost of a page, field errors, status checks outside
+  the
+  table and the lack of library documentation.
+- **Alternatives rejected:** ids only in responses (the screens need names and marks); a query per row.
+- **Affects:** `references.md`, `exception.md`, `state-machine.md`, `repository.md`, `service.md`, `web.md`,
+  `pagination.md`, `liquibase.md`, `aggregate.md`, `structure.md`, `security.md`, `backend/CLAUDE.md`.
+
+### D-068 Frontend rules: details accepted in the review (2026-10-09)
+
+- **Decision:**
+    - Native date inputs draw their text in the browser's locale (an accepted deviation from `DD.MM.YYYY`); everywhere
+      else a date is `DD.MM.YYYY`. A row of Today shows the time as `HH:mm`.
+    - Georgian text is drawn by the `system-ui` fallback; no second font.
+    - Status names appear in the code only in `StatusBadge`, `strings/status.ts` and `features/workorder/filters.ts`.
+    - The cards of a customer and a vehicle are open to every logged-in user; only the lists and the "new" pages are
+      tied
+      to menu items.
+    - The conflict button is "Refresh"; a 403 or a 404 on a page query gives "No access" or "Not found".
+    - Assumptions: a board column shows 10 cards; the global search starts from one character, 300 ms after the last
+      keystroke.
+- **Reason:** Closes the gaps found in the consistency check of the frontend rules.
+- **Alternatives rejected:** a Georgian font (extra weight for names that may never appear).
+- **Affects:** `formats.md`, `errors.md`, `permissions.md`, `routing.md`, `theme.md`, `forms.md`.
+
+### D-067 A customer who did not come: the manager cancels the order (2026-10-09)
+
+- **Decision:** For a no-show the manager cancels the order with the reason "No show". The system never cancels or moves
+  an appointment by itself. Appointments of earlier days that were not accepted leave the Today screen and stay in
+  Orders in the status "Appointment".
+- **Reason:** Simple, and consistent with cancel in `APPOINTMENT` (D-018).
+- **Alternatives rejected:** an automatic cancellation; a separate "no show" status.
+- **Affects:** `docs/domain/work-order-lifecycle.md`, `docs/product/screens.md`, `docs/product/seed-data.md`, `TASK.md`.
+
+### D-066 The seed: customers without a vehicle are former owners (2026-10-09)
+
+- **Decision:** A station registers a customer when the first vehicle arrives, so a customer without a vehicle is a
+  former owner after a transfer. The seed has 30 customers (2 deleted, without live vehicles; 3 former owners; 25 with
+  vehicles, 5 of them with two) and 31 vehicles (30 live, 1 deleted). One cancelled order is a no-show. Two orders
+  belong to two of the former owners.
+- **Reason:** The old counts (45 vehicles for 30 customers) did not add up.
+- **Alternatives rejected:** customers registered ahead of any visit.
+- **Affects:** `docs/product/seed-data.md`.
+
+### D-065 The last active manager is protected (2026-10-09)
+
+- **Decision:** At least one active manager always remains. Deactivating a manager, or taking the manager role from one,
+  is rejected when no other active manager would remain, with the text "At least one active manager must remain.". The
+  service locks the target and every active manager in id order, then checks the rule again (D-056). This covers two
+  managers acting on each other at the same moment.
+- **Reason:** D-056 protected only the own record; one manager could still demote the other.
+- **Alternatives rejected:** self-protection only.
+- **Affects:** `docs/domain/operations.md`, `docs/domain/entities.md`, `docs/product/screens.md`, `TASK.md`,
+  `service.md`, `exception.md`.
+
+### D-064 A vehicle's mileage comes from its latest order (2026-10-09)
+
+- **Decision:** The mileage of an order updates the vehicle only if no other order of that vehicle with a later
+  `intakeDate` has a mileage. A correction of an older order does not change the vehicle. A cleared mileage never
+  changes it.
+- **Reason:** Editing an old order must not break "the mileage of a vehicle equals the mileage of its newest order"
+  (seed rule 4).
+- **Alternatives rejected:** an update on every change; an update only when the value grows.
+- **Affects:** `docs/domain/entities.md`, `docs/product/seed-data.md`, `aggregate.md`.
+
+### D-063 Order number, creation record, read-only closed orders, movable appointment (2026-10-09)
+
+- **Decision:**
+    - `WorkOrder.number` is an integer assigned by the service from a database sequence: unique, never changed, never
+      reused. It is shown in the header, the lists and the printed card. Seeded numbers start at 1001, and the sequence
+      is restarted above them after the seed.
+    - Creating an order writes the first history record: `fromStatus` empty, `toStatus` `APPOINTMENT`, by the creator.
+      `WorkOrderStatusHistory.fromStatus` is optional.
+    - An order in `CLOSED` or `CANCELLED` is read-only in every respect: lines, description, mileage, notes and the
+      responsible mechanic. While the order is open, a manager can edit the description, mileage and the mechanic, and a
+      mechanic of the order the notes. In `READY` and `PAID` only the lines are locked.
+    - A manager can change `intakeDate` (move the appointment) while the order is in `APPOINTMENT`.
+- **Reason:** The dialog "Close order" promises that nothing changes afterwards. The printed card serves as the invoice
+  and needs a number that people can say aloud. The seed rule "the status equals the newest history record" needs a
+  creation record. Appointments get moved.
+- **Alternatives rejected:** showing a UUID; no creation record (the rule would need an exception); a fixed appointment
+  time.
+- **Affects:** `docs/domain/entities.md`, `operations.md`, `work-order-lifecycle.md`, `docs/product/screens.md`,
+  `seed-data.md`, `TASK.md`, root `CLAUDE.md`, `liquibase.md`, `aggregate.md`, `state-machine.md`.
+
+### D-062 The employee response carries the flags for its own record (2026-10-09)
+
+- **Decision:** The employee response carries `canDeactivate` and `canChangeRole`, computed in the service
+  (`EmployeePermissions`) from the current user and the record; both are false for the user's own record. The UI draws
+  the controls disabled when a flag is false (as `screens.md` asks), with no hint text, and never compares an id. This
+  entry was referred to by `permissions.md` before it existed in the file; it replaces the wording "the control is not
+  drawn".
+- **Reason:** The UI must not know whose record is whose; the backend already does (D-056, D-061).
+- **Alternatives rejected:** the client compares the id of the row with the id of the user; not drawing the controls.
+- **Affects:** `permissions.md`, `web.md`, `docs/product/screens.md`.
+
 ### D-061 The backend returns the rights flags and the version of every row it lets the UI act on (2026-10-08)
 
 - **Decision:** The UI never compares a role. Rights reach it as data:
@@ -36,15 +237,17 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
       list of menu items the user has, values `TODAY`, `ORDERS`, `MY_ORDERS`, `CUSTOMERS`, `VEHICLES`, `PRICE_LIST`,
       `EMPLOYEES`; the first one is the home page after login), `canManageCustomers`, `canManageVehicles` (create, edit,
       delete, change owner), `canCreateOrders`. Each is computed by the backend from the role in one place.
-    - The order response carries `permissions`: `canEditInfo` (problem description, mileage), `canEditNotes`,
-      `canAssignMechanic`, `canEditLines` (rights and status together), `canRecordPayment` (role, status and no payment
-      yet). `linesEditable` (D-059) stays: it is the status rule alone and drives the note "Lines are locked".
+    - The order response carries `permissions`: `canEditInfo` (problem description, mileage), `canEditIntakeDate`,
+      `canEditNotes`, `canAssignMechanic`, `canEditLines` (rights and status together), `canRecordPayment` (role,
+      status, no payment yet and a total above zero). `canEditInfo`, `canEditNotes` and `canAssignMechanic` are false
+      for `CLOSED` and `CANCELLED` (D-063). `linesEditable` (D-059) stays: it is the status rule alone and drives the
+      note "Lines are locked".
     - A list row of orders carries `version` and `transitions`, so a command can be sent from a row (Today, My orders).
     - The text of `error.concurrent-update` is "The order was changed by another user. Refresh the page." (the text of
       `screens.md`); the UI shows `detail` as it comes.
 - **Reason:** A role check on the client can disagree with the backend, and the frontend rules forbid it. Without a flag
   a button for a manager-only action would need a role literal. A command from a list row needs the version the user
-  saw.
+  saw. A payment of zero is invalid, so a free order needs no payment button.
 - **Alternatives rejected:** a table of rights in the frontend (`canEditOrderSection`); `usePermissions` comparing
   roles; a second request for the version before every command.
 - **Affects:** `web.md`, `aggregate.md`, `state-machine.md`, `security.md`, `exception.md`,
@@ -57,8 +260,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
   nothing below 14 px, a visible focus ring, no hover-only behavior. Lists are rows or cards (`EntityList`), not tables;
   the board wraps into a grid; the menu is a bottom tab bar, a column of icons or a sidebar by width. `screens.md` and
   `ui-style.md` were updated to match (44 px → 48 px, font sizes, the control border color `#8A817B` with 3:1 contrast,
-  "List / Board", "No access"). The browser checks of the touch rule cover the key screens only (login, a list, the
-  order card, a dialog) in three Playwright projects.
+  "List / Board", "No access"). The browser checks of the touch rule cover the key screens listed in `e2e.md` in three
+  Playwright projects.
 - **Reason:** Mechanics work with dirty hands on a phone; a table does not fit a phone and a second layout means a
   second set of screens and tests. The old control border `#E4DCD6` has a contrast of 1.35:1, too low for a control.
 - **Alternatives rejected:** a table on the desktop and a list on the phone (two sets of components); keeping 44 px
@@ -79,14 +282,14 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 ### D-058 A mechanic can list active mechanics (id and name) (2026-10-08)
 
-- **Decision:** A read for both roles returns active employees with the role `MECHANIC`, with id and name only. A
-  mechanic uses it to choose a line performer. The responsible mechanic and a line performer must be active `MECHANIC`
-  employees.
+- **Decision:** A read for both roles returns active employees with the role `MECHANIC`, with id and name only
+  (`GET /employees/mechanics`, unpaged). A mechanic uses it to choose a line performer. The responsible mechanic and a
+  line performer must be active `MECHANIC` employees.
 - **Reason:** A mechanic edits lines of own orders but cannot read the employee list (managers only). The read exposes
   no other field.
 - **Alternatives rejected:** only the manager assigns performers (narrows the mechanic's rights); the performer is
   always the mechanic who edits.
-- **Affects:** `docs/domain/operations.md`, `docs/domain/entities.md`.
+- **Affects:** `docs/domain/operations.md`, `docs/domain/entities.md`, `web.md`, `pagination.md`.
 
 ### D-057 The payment date is prefilled and not in the future (2026-10-08)
 
@@ -99,10 +302,11 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 ### D-056 Employee rules: no self-deactivation, no role change of oneself, row locks (2026-10-08)
 
-- **Decision:** An employee cannot deactivate themselves or change their own role, so at least one active manager always
-  remains. Two managers deactivating each other at the same moment are handled in the service: it locks the rows it
-  checks with a pessimistic write lock in id order, then checks the rule again. Deactivating a mechanic with open orders
-  is allowed; the manager reassigns the responsible mechanic.
+- **Decision:** An employee cannot deactivate themselves or change their own role. Two managers deactivating each other
+  at the same moment are handled in the service: it locks the rows it checks with a pessimistic write lock in id order,
+  then checks the rule again. Deactivating a mechanic with open orders is allowed; the manager reassigns the
+  responsible mechanic. The rule "at least one active manager always remains" was first meant to follow from the
+  self-protection; it is stated and extended to the demotion of another manager in D-065.
 - **Reason:** A rule over several rows is not protected by `@Version` of single rows (write skew). A short row lock
   works on H2 and PostgreSQL alike.
 - **Alternatives rejected:** `SERIALIZABLE` isolation (differs between databases); accepting the risk; forbidding to
@@ -158,7 +362,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
   verdict. Two skills: `plan` (checks that `TASK.md` exists, then starts the planner) and `evaluate-plan` (starts the
   reviewer in plan review mode and saves `context/PLAN_REVIEW.md` with the verdict `READY`, `READY WITH MINOR CHANGES`
   or `REVISE BEFORE IMPLEMENTATION`). The initial task status is `pending`. The orchestrator and the planner stay two
-  agents. The skills are the only skills; MCP servers are still not connected.
+  agents. The skills are the only skills; MCP servers are still not connected. D-071 lets the orchestrator do the
+  steps of the two skills itself.
 - **Reason:** The learning assignment names these files and asks for a planner with a revision loop and an evaluator.
   Keeping the planner separate keeps the long reading of all documents out of the orchestrator's context and gives each
   agent narrow rights. This changes D-008 ("only the orchestrator writes the plan") and D-042 (the orchestrator edits
@@ -227,27 +432,28 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Decision:** Blocking findings go back to the worker at most twice. Then the task is `blocked` with the findings in
   its notes, and the run goes on with independent tasks. One final review covers the whole run. When the schema stage
   has passed review, the orchestrator stops until the human records "Schema frozen".
-- **Reason:** The loop cannot run forever, whatever is left is visible in `plan.md`, and the schema gets the human's
-  attention first.
+- **Reason:** The loop cannot run forever, whatever is left is visible in `context/PLAN.md` (it was `docs/plan.md`, see
+  D-051), and the schema gets the human's attention first.
 - **Alternatives rejected:** no limit (it may loop); one round (weaker).
 - **Affects:** root `CLAUDE.md`, `orchestrator.md`.
 
 ### D-043 A missing requirement is an assumption, except in five areas (2026-10-05)
 
 - **Decision:** The worker takes the most conservative reading and reports it, and the orchestrator records it under
-  "Assumptions" in `plan.md`. The agent stops instead when the question touches the Open list in this file, anything
-  postponed or out of scope, money, rights and roles, deleting data, or a schema change after the freeze.
+  "Assumptions" in `context/PLAN.md` (it was `docs/plan.md`, see D-051). The agent stops instead when the question
+  touches the Open list in this file, anything postponed or out of scope, money, rights and roles, deleting data, or a
+  schema change after the freeze. Before it assumes or stops, it looks for a concrete directive in the Log (D-072).
 - **Reason:** A run can reach its end without the human, who reviews the assumptions afterwards (run, remarks, second
   run). The five areas are where a wrong guess costs most.
 - **Alternatives rejected:** always stop (the run may stall); always assume (a guess can drag code with it).
-- **Affects:** root `CLAUDE.md`, all agents, `context/PLAN.md` (was `docs/plan.md`, see D-051).
+- **Affects:** root `CLAUDE.md`, all agents, `context/PLAN.md`.
 
 ### D-042 The orchestrator is an agent, and tasks run one at a time (2026-10-05)
 
 - **Decision:** A run starts with `claude --agent orchestrator`. Its tools are the Agent tool limited to the five other
-  agents, Read, Grep, Glob and Edit. It has no shell and, by instruction, edits only the plan (`docs/plan.md`, now
-  `context/PLAN.md`, see D-051). Tasks run sequentially without worktrees: the schema and the seed first, then backend,
-  then frontend.
+  agents, Read, Grep, Glob and Edit (Write for `context/` is added by D-071). It has no shell and, by instruction,
+  edits only the plan (`docs/plan.md`, now `context/PLAN.md`, see D-051). Tasks run sequentially without worktrees: the
+  schema and the seed first, then backend, then frontend.
 - **Reason:** An explicit list of agents it may call and no way to run the gates itself. Sequential runs avoid conflicts
   over ports, the database and merging.
 - **Alternatives rejected:** a plain main session; parallel workers in worktrees (ports and a database per worktree, a
@@ -258,7 +464,9 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 - **Decision:** `.claude/settings.json` denies edits to `docs/domain`, `docs/product`, `docs/decisions.md`,
   `.claude/rules`, `.claude/agents` and the settings file, and denies `git commit` and `git push`. It allows the build
-  commands (`./gradlew`, `npm run`, `docker compose`, read-only git). The human commits after a review.
+  commands (`./gradlew`, `npm run`, read-only git). The human commits after a review. Status (2026-10-09): the deny
+  rules are postponed until the planning phase ends and the file has only `allow` entries for now; `docker compose` is
+  no longer allowed (D-052).
 - **Reason:** A deny rule is enforced, a "never" in a text is not. The deny rules cover the file tools only: a shell
   command can still write a file, so the instructions forbid that too. Without commits a run leaves a diff for the human
   to read.
@@ -268,8 +476,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 ### D-040 Six agents; Opus only for the planner (2026-10-05)
 
 - **Decision:** `orchestrator`, `planner`, `db-dev`, `backend-dev`, `frontend-dev`, `reviewer`. The planner runs on Opus
-  5.5, the others on Sonnet 5.5 (the planner model was replaced by D-049: all agents run on Sonnet 5.5). The planner and
-  the reviewer use high effort. `db-dev` is the author of the changesets.
+  5.5, the others on Sonnet 5.5 (replaced by D-049: all agents run on Sonnet 5.5). The planner and the reviewer use high
+  effort. `db-dev` is the author of the changesets.
 - **Reason:** The schema and the seed come first and need a clean context. The planner runs rarely, so a stronger model
   is affordable there, while the reviewer runs on every task.
 - **Alternatives rejected:** four roles (the schema work bloats `backend-dev`); a separate tester and security reviewer
@@ -278,7 +486,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 ### D-039 The lifecycle and the seed data are approved (2026-10-05)
 
-- **Decision:** `docs/domain/work-order-lifecycle.md` and `docs/product/seed-data.md` are agreed.
+- **Decision:** `docs/domain/work-order-lifecycle.md` and `docs/product/seed-data.md` are agreed. (The lifecycle text is
+  a reconstruction, see D-074.)
 - **Reason:** Approved by the human.
 - **Alternatives rejected:** none.
 - **Affects:** both files (status line).
@@ -388,7 +597,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 - **Decision:** One seed, loaded in development only: employees, price list, customers, vehicles and about 60 orders in
   every status with lines, payments and history, so the system looks alive at the first start. It is specified in
-  `docs/product/seed-data.md` and built as the last task of the schema stage.
+  `docs/product/seed-data.md` and built as the last task of the schema stage. The counts of customers and vehicles were
+  corrected by D-066.
 - **Reason:** A learning project; a living system is the fastest check of every screen. One dataset needs no extra
   context. It also gives the first manager account.
 - **Alternatives rejected:** reference data only; a separate `demo` context (more files and contexts for little gain).
@@ -411,15 +621,15 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 - **Alternatives rejected:** audit columns on every table (`updated_at` does not update itself and needs code).
 - **Affects:** `docs/domain/entities.md`, `jpa-entity.md`, `liquibase.md`.
 
-### D-024 Own schema `repair_schema`, set once in the configuration (2026-10-05)
+### D-024 Own schema `repair_schema`, set once in the configuration (2026-10-05; the Docker parts replaced by D-052)
 
 - **Decision:** Tables live in `repair_schema`. Structured changes carry no `schemaName`: the default schema is set in
-  the Liquibase and Hibernate configuration. The environment creates the schema from one script that Docker Compose,
-  Testcontainers and H2 all run. Raw SQL uses the `${schema}` property.
+  the Liquibase and Hibernate configuration. The environment creates the schema from one script that the H2 URL runs
+  (formerly also Docker Compose and Testcontainers, see D-052). Raw SQL uses the `${schema}` property.
 - **Reason:** A `schemaName` in every change gets forgotten by agents. The cost is three places that hold the name (the
   script, the configuration, the master property); tests fail if they differ.
 - **Alternatives rejected:** the `public` schema; `schemaName` in every change.
-- **Affects:** `liquibase.md`, `application.yaml`, `docker-compose.yml`.
+- **Affects:** `liquibase.md`, `application.yaml`.
 
 ### D-023 The schema is built first and then frozen (2026-10-05)
 
@@ -547,7 +757,7 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 
 - **Decision:** For a user and an order the backend returns the transitions the user may ever use, each with `primary`,
   `enabled`, `commentRequired`, `confirm` and, when disabled, a reason code and message. Transitions the user can never
-  use are not returned.
+  use are not returned. (D-059 adds `label`, `targetStatus` and `group`.)
 - **Reason:** The screens show disabled buttons with hints; this keeps all transition knowledge on the backend.
 - **Alternatives rejected:** only allowed transitions with hints derived in the frontend (rules leak); hiding
   unavailable buttons (the user cannot see why).
@@ -567,9 +777,8 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
   split, backend first. Only the orchestrator writes the plan. (Changed by D-051: the planner writes the task list in
   `context/PLAN.md`; the orchestrator owns the statuses.)
 - **Reason:** Matches "a worker edits only its own area" and contract-first; no write conflicts in the plan.
-- **Alternatives rejected:** one agent for a whole vertical slice; one plan file written by every worker. Who sets the
-  tasks and the two-level structure are deferred.
-- **Affects:** root `CLAUDE.md`, `docs/plan.md`.
+- **Alternatives rejected:** one agent for a whole vertical slice; one plan file written by every worker.
+- **Affects:** root `CLAUDE.md`, `context/PLAN.md`.
 
 ### D-007 `PUT /{id}` for standalone entities, one operation per section for the order (2026-10-05)
 

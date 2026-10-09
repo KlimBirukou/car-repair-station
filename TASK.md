@@ -1,8 +1,8 @@
 # TASK: Car Repair Station
 
 The entry description of the product for the planner and for anyone new to the project. It summarizes and points to the
-detailed files under `docs/`. **Where this file differs from `docs/`, the files in `docs/` win.** Do not copy rules from
-here into code: read the file that owns the rule.
+detailed files under `docs/`. **Where this file differs from `docs/`, the files in `docs/` win, and the Log of
+docs/decisions.md wins over both.** Do not copy rules from here into code: read the file that owns the rule.
 
 ## 1. Application
 

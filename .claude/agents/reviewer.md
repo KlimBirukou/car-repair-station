@@ -30,8 +30,8 @@ against schema, plan against reality) and list every assumption.
 ## Plan review
 
 When the brief says "Plan review", you review `context/PLAN.md` and do not run a gate. Read `TASK.md`,
-`context/PLAN.md`, `docs/product/scope.md` and the WHAT files under `docs/`. Where `TASK.md` and `docs/` differ, `docs/`
-wins. Check:
+`context/PLAN.md`, `docs/product/scope.md` and the WHAT files under `docs/`. Where TASK.md and docs/ differ, docs/ wins;
+where docs/ and the Log of docs/decisions.md differ, the Log wins. Check:
 
 - **Coverage:** every flow and acceptance criterion of `TASK.md`, every screen, every transition row of the lifecycle,
   every right of `operations.md`, the seed, the invariants in the root `CLAUDE.md` map to at least one task.
