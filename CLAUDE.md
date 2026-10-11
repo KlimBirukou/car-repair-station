@@ -6,9 +6,9 @@ Internal web CRM for one car service station. It replaces Excel and paper logs: 
 services, parts, payments. Users are employees only (`MANAGER`, `MECHANIC`); a customer is a record, not a user. All
 work is recorded in the system, including walk-in customers and towed vehicles.
 
-## Current phase: planning only
+## Current phase: preparation
 
-The project is in the discussion and planning phase. This section overrides every other instruction in this file, in
+The project is being prepared for the first run. This section overrides every other instruction in this file, in
 `backend/CLAUDE.md`, in `frontend/CLAUDE.md`, in the agent definitions and in `.claude/settings.json`. It stays in force
 until the human removes it.
 
@@ -19,12 +19,14 @@ Forbidden until then:
 - Running, building or testing the application, including the gates `./gradlew check` and `npm run check`.
 - Creating or changing anything in `backend/` and `frontend/` except their `CLAUDE.md`: build files, wrappers, configs,
   sources, changelogs, the OpenAPI file, the generated client, any generated code.
-- Starting the `planner`, `db-dev`, `backend-dev`, `frontend-dev` and `orchestrator` agents and the `plan` and
-  `evaluate-plan` skills. The `reviewer` runs only when the human asks.
-- Creating new skills, connecting MCP servers or Context7, adding tools.
+- Starting the `db-dev`, `backend-dev` and `frontend-dev` agents, and Phase 2 (the loop) of the orchestrator. The
+  orchestrator may run Phase 1 only: build and review the plan, and stop at the confirmation by the human.
+- Connecting any MCP server except Context7 (D-075), creating skills other than `plan`, `evaluate-plan` and
+  `check-consistency`, adding other tools.
 
-Allowed: reading files, answering questions, discussing the plan and the technical questions, and editing the files the
-human names or permits.
+Allowed: reading files, answering questions, discussing the plan and the technical questions, editing the files the
+human names or permits, the `plan`, `evaluate-plan` and `check-consistency` skills, the `planner` and `reviewer` agents,
+Phase 1 of the orchestrator, and Context7.
 The rules "a task is done only when the gate is green" and the workflow below apply after this section is removed. Git
 (commits, pushes) is done by the human.
 
@@ -112,6 +114,9 @@ Read the relevant file before working on a task. Paths are in backticks on purpo
   under "Sources of truth". Where it speaks, it wins over the rules.
 - If a rule cannot be followed without breaking the specification, stop and report. Do not bend either of them.
 - Tests are part of the task, not a follow-up.
+- Library documentation: use Context7 (D-075) for the API of a pinned library. If it is unreachable, take the API
+  from the pinned dependencies (backend: the Spring Boot dependency management and the resolved jars; frontend: the
+  installed typings) and report what could not be confirmed.
 
 ### Workflow: plan and progress
 
@@ -125,13 +130,14 @@ Read the relevant file before working on a task. Paths are in backticks on purpo
   `review`, `done`, `blocked`), notes.
 - A task states WHAT only. HOW is never copied into tasks: it comes from the area's rules folder
   (`.claude/rules/<area>/`).
-- Flow: the `plan` skill starts the planner, which writes the tasks to `context/PLAN.md`; the `evaluate-plan` skill
-  checks the plan against `TASK.md` and `docs/` and writes `context/PLAN_REVIEW.md` with a verdict (`READY`,
-  `READY WITH MINOR CHANGES`, `REVISE BEFORE IMPLEMENTATION`); the planner in `revise` mode updates the plan from the
-  findings → the human confirms the plan → the orchestrator hands one task to the worker of its area → the worker
-  implements, runs the gate and reports `review` → the reviewer checks the result against acceptance criteria and
-  rules → blocking findings go back to the worker for at most two review rounds; if blocking findings remain, the task
-  becomes `blocked`, otherwise it is `done`. After the last task the reviewer reviews the whole run once.
+- Flow: the orchestrator starts the `planner` (mode `plan`) to write the tasks to `context/PLAN.md`, then the `reviewer`
+  in plan review mode, saves `context/PLAN_REVIEW.md` with a verdict (`READY`, `READY WITH MINOR CHANGES`,
+  `REVISE BEFORE IMPLEMENTATION`) and, if the verdict is not `READY`, starts the planner in `revise` mode, up to three
+  rounds. The `plan` and `evaluate-plan` skills do the same steps by hand. The human confirms the plan → the
+  orchestrator hands one task to the worker of its area → the worker implements, runs the gate and reports `review` →
+  the reviewer checks the result against acceptance criteria and rules → blocking findings go back to the worker for at
+  most two review rounds; if blocking findings remain, the task becomes `blocked`, otherwise it is `done`. After the
+  last task the reviewer reviews the whole run once.
 - The schema and the seed come first (`db-dev`). When they have passed review, the orchestrator stops until the human
   records "Schema frozen" in `docs/decisions.md`.
 - A worker edits only its own area. If a task needs the other area or a change in `docs/`, it stops and reports, and the
@@ -142,8 +148,9 @@ Read the relevant file before working on a task. Paths are in backticks on purpo
 Definitions live in `.claude/agents/`; skills in `.claude/skills/` (`plan`, `evaluate-plan`). A run starts with
 `claude --agent orchestrator`. Tasks run one at a time, never in parallel.
 
-- `orchestrator` (Sonnet 5.5, the main session): reads the plan, delegates, tracks status and writes the statuses,
-  assumptions and run summary in `context/PLAN.md`. It has no shell and does not write application code.
+- `orchestrator` (Sonnet 5.5, the main session of the run, D-071): starts the planner and the plan review, asks the
+  human the questions of the subagents, delegates the tasks, tracks status and writes statuses, assumptions and the run
+  summary in `context/PLAN.md`. It writes only in `context/`, has no shell and does not write application code.
 - `planner` (Sonnet 5.5): reads the requirements and writes only `context/PLAN.md`. Mode `plan` turns `TASK.md` and the
   WHAT files into tasks with acceptance criteria; mode `revise` updates the plan from `context/PLAN_REVIEW.md` and lists
   the changes. A subagent cannot ask the human, so it returns missing or contradictory requirements to the orchestrator,
@@ -154,7 +161,8 @@ Definitions live in `.claude/agents/`; skills in `.claude/skills/` (`plan`, `eva
   files it references, the area's `CLAUDE.md` and every file in its rules folder.
 - `reviewer` (Sonnet 5.5, high effort): read-only. Runs the gate, checks acceptance criteria and rules, reports each
   finding as `[blocking]`, `[suggestion]` or `[nit]`. In "Plan review" mode it compares the plan with `TASK.md` and
-  `docs/` and returns findings and a verdict; the `evaluate-plan` skill saves them.
-- Agents never commit or push. `.claude/settings.json` denies edits to the human's files (`docs/domain/`,
-  `docs/product/`, `docs/decisions.md`, `.claude/rules/`, `.claude/agents/`). The deny rules cover the file tools, not
-  shell commands: never write those files from the shell either.
+  `docs/` and returns findings and a verdict; the orchestrator or the evaluate-plan skill saves them. In "Consistency
+  review" mode the check-consistency skill saves its answer.
+- Agents never commit or push. `.claude/settings.json` denies edits (the deny rules are postponed, D-041) to the human's
+  files (`docs/domain/`, `docs/product/`, `docs/decisions.md`, `.claude/rules/`, `.claude/agents/`). The deny rules
+  cover the file tools, not shell commands: never write those files from the shell either.

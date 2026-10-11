@@ -20,8 +20,7 @@ This file is the highest authority of the project.
 Not decided yet. A run that needs one of these must stop and report it, not guess.
 
 - Rules not written yet: the domain records rule.
-- MCP servers (Context7, Playwright MCP) are not connected and no other skills are created (D-051 declared `plan` and
-  `evaluate-plan`). The browser tests are Playwright code, not MCP (D-034).
+- No other MCP servers and no other skills than those of D-075 are planned. Playwright MCP is not used (D-034).
 - Library documentation (Context7) is not connected. Until it is, a worker takes the exact names and versions of a
   pinned library from the pinned dependencies (backend: the dependency management of Spring Boot 4.0.5 and the
   classes of the resolved jars; frontend: the installed typings and release notes), and reports what it could not
@@ -47,6 +46,28 @@ Not decided yet. A run that needs one of these must stop and report it, not gues
 ```
 
 ## Log
+
+### D-075 One MCP server, Context7; three skills; the phase is "preparation" (2026-10-09)
+
+- **Decision:**
+    - Context7 is the only MCP server. It is remote (`https://mcp.context7.com/mcp`), declared in `.mcp.json`, with the
+      key from the environment variable `CONTEXT7_API_KEY` (never in the repository). It is enabled for the project in
+      `.claude/settings.json`. `db-dev`, `backend-dev`, `frontend-dev` and `reviewer` may call its two tools
+      (`resolve-library-id`, `query-docs`); the planner and the orchestrator may not. Queries carry library names and
+      short questions only, never project code, secrets or personal data. If Context7 is unreachable, the pinned
+      dependencies are the source (D-069) and the worker reports what it could not confirm.
+    - The skills are `plan`, `evaluate-plan` (the manual form of the orchestrator's Phase 1, D-071) and
+      `check-consistency` (a consistency review of the documents, the rules and the process files by scope, with the
+      reviewer; the answer is saved to `context/CONSISTENCY_REVIEW.md`). No other skills.
+    - The section in the root `CLAUDE.md` is renamed "preparation": code, the gates and the workers stay forbidden; the
+      planner, the reviewer, Phase 1 of the orchestrator, the three skills and Context7 are allowed.
+- **Reason:** The libraries (Spring Boot 4, Jackson 3, springdoc, Ant Design 6) are newer than the knowledge of the
+  models, and the rules cannot be checked against them from memory. The consistency pass of D-074 is a repeatable job.
+- **Alternatives rejected:** Playwright MCP (D-034: the tests are code in the repository); GitHub and database MCP
+  servers (the human commits, the database is H2); a skill per rule (the rules load by `paths`); lifting the whole
+  planning-only section at once (it would allow code before the plan is confirmed).
+- **Affects:** root `CLAUDE.md`, `.mcp.json`, `.claude/settings.json`, `.claude/agents/`, `.claude/skills/`,
+  `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `.claude/rules/frontend/api.md`.
 
 ### D-074 The lifecycle document is a reconstruction (2026-10-09)
 

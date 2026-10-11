@@ -1,7 +1,7 @@
 ---
 name: frontend-dev
 description: Implements one frontend task in React and TypeScript with its tests. Use for screens, components and frontend wiring.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: claude-sonnet-5-5
 permissionMode: acceptEdits
 maxTurns: 100

@@ -32,8 +32,8 @@ Decided:
 
 - Component library: Ant Design 6 (the version is pinned in `package.json`). The look is applied through
   `ConfigProvider` tokens (colors, radius, font, shadow), not by overriding internal CSS class names.
-- Library documentation: until Context7 is connected, take the API of a pinned library from its installed typings and
-  release notes, not from memory. When Context7 is connected, use it.
+- Library documentation: Context7 (D-075). If it is unreachable, take the API of a pinned library from its installed
+  typings and release notes, not from memory.
 - React, TypeScript (strict mode), Vite. Routing: React Router. Local UI state: React state; no global store until a
   real need appears.
 - API: `openapi-typescript` generates the types from `backend/openapi/openapi.json` into `src/api/generated`, and

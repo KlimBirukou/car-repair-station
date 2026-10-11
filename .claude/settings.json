@@ -1,12 +1,15 @@
 {
+  "enabledMcpjsonServers": ["context7"],
   "permissions": {
     "allow": [
       "Edit(/context/**)",
       "Write(/context/**)",
+      "mcp__context7",
       "Bash(./gradlew *)",
       "Bash(npm run *)",
       "Bash(npm ci)",
       "Bash(npm install)",
+      "Bash(npm install *)",
       "Bash(npx playwright *)",
       "Bash(git status)",
       "Bash(git diff *)",

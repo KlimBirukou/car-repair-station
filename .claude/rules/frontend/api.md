@@ -136,8 +136,8 @@ The specification may ask for polling or push updates of a screen. Follow it for
 ## Infrastructure
 
 - `openapi-typescript`, `openapi-fetch`, `@tanstack/react-query`. Exact versions are pinned; take the API of each from
-  the installed typings and the release notes of the pinned version, not from memory. When Context7 is connected (it is
-  not at present), it may be used for the same purpose.
+  the installed typings and the release notes of the pinned version, not from memory. Context7 is connected (D-075): use
+  it for the API of the pinned version.
 - Vite proxy of `/api` to the backend in development (no CORS, no base URL setting).
 
 ## Verification

@@ -42,9 +42,8 @@ section is the map.
 - H2 (D-052; PostgreSQL may replace it later), Liquibase (YAML), Spring Data JPA (Hibernate), Bean Validation.
 - Lombok, MapStruct, springdoc-openapi, uuid-creator, Spring Security (BCrypt and JWT).
 - Tests: JUnit, Mockito, ArchUnit. Integration tests run on H2.
-- Library documentation: until Context7 is connected, the exact artifact names and versions of the pinned libraries come
-  from the dependency management of Spring Boot 4.0.5 and from the classes of the resolved jars, not from memory. When
-  Context7 is connected, use it.
+- Library documentation: Context7 (D-075). If it is unreachable, the exact artifacts and versions come from the
+  dependency management of Spring Boot 4.0.5 and the resolved jars, not from memory.
 
 ### Architecture and packages
 
