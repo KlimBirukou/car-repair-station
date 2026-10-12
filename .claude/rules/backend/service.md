@@ -48,7 +48,7 @@ Unless explicitly overridden by the project specification:
   version check. The repository port has a method for this (`lockManagersAndEmployee(UUID id)`); the adapter implements
   it with `@Lock(LockModeType.PESSIMISTIC_WRITE)`.
 - **Null contract:** Use Lombok `@NonNull` on required parameters of `*ServiceImpl` methods. Lombok inserts the check
-  into a method body; on the interface it is documentation only.
+  into a method body; on the interface it is documentation only. No test is written for it (D-079).
 - **Errors:** Throw `BusinessException` subclasses (see the Exceptions rule). Do not catch persistence exceptions.
 - **Logging:** Log successful state-changing operations at `INFO` with the entity ID, after the repository call returned
   (insert and update flush inside the adapter, so conflicts are thrown before the log line). Do not log routine reads or
@@ -117,6 +117,8 @@ dependency, transaction model, mapping approach, or ID strategy.
   `jakarta.persistence..`, `org.springframework.data.jpa..` or `..web..`; no field injection.
 - Unit tests with a mocked port and a mocked `IdGenerator`: create assigns the generated ID; update keeps ID and
   immutable fields; missing target throws `NotFoundException`.
+- Every business failure branch and every rights branch of a use case has a test; a pass-through use case has the
+  success test only.
 - A hidden field has two unit tests: the value for the allowed role, `null` for the other.
 - Reviewer checklist: every write method is `@Transactional`, every read method is `readOnly`, every successful write
   logs once.

@@ -206,6 +206,8 @@ names differently. The changelogs stay as they are.
 - No profile without an explicit `spring.liquibase.contexts`.
 - No default for `id`, `version` or `delete_token`.
 - No empty list item in YAML (a lone `-`).
+- No test that inserts rows by SQL to try a constraint: constraints are proven through the adapters (stage 2, D-077).
+  The tests of this rule only read.
 
 ## Special Cases
 
@@ -223,11 +225,13 @@ names differently. The changelogs stay as they are.
 ## Verification
 
 - `ChangelogPortabilityTest` in `src/integrationTest`: H2 in memory, context `seed`; every changeset and the seed apply,
-  and every seeded table has rows.
+  and every seeded table has rows. The application context starts, soddl-auto=validate runs against the entities that
+  exist.
 - `SeedConsistencyTest` (H2, context `seed`): the consistency rules of `docs/product/seed-data.md`.
 - `ddl-auto=validate` passes on H2.
-- Convention test over the YAML files: every `*-changelog.yaml` is included by the master; every constraint and index
-  name starts with `pk_`, `fk_`, `uk_`, `idx_` or `ck_`; no id is repeated.
+- In src/test (it reads the files, no Spring): convention test over the YAML files - every `*-changelog.yaml` is
+  included by the master; every constraint and index name starts with `pk_`, `fk_`, `uk_`, `idx_` or `ck_`; no id is
+  repeated.
 - Reviewer checklist: file-per-table, the include order, explicit names, a `rollback` on every `sql` change,
   `context: seed` on every seed changeset, no item from Prohibitions.
 - `ChangelogPortabilityTest` (context `seed`): the next value of `work_order_number_seq` is greater than the highest

@@ -10,14 +10,22 @@ paths:
 
 Unless explicitly overridden by the project specification:
 
-- **What:** Every class with logic has a test class `<Class>Test` in the same package as the class.
-- **When:** Together with the code. A task is done only when `./gradlew check` is green.
-- **Where:**
-    - `src/test/java`: unit tests of services, persistence mapper tests, `@WebMvcTest` slices, ArchUnit tests.
-    - `src/integrationTest/java`: everything that needs a database or the full context (adapters, specifications,
-      constraints, smoke flows, the changelog portability test, the seed consistency test). The database is H2 in
-      memory, with the same init script as the application.
-    - `check` runs both source sets.
+- **What:** Every class with logic has a test class `<Class>Test` in the same package. A test proves a behaviour the
+  task lists; no test is written for coverage.
+- **When:** After the code of the task, not before: write the code, then its tests, then run the gate once. A task is
+  done only when `./gradlew check` is green.
+- **Stages (D-077):** The first run is stage 1.
+    - `src/test/java`: unit tests of services and of pure classes (the transition table and its guards,
+      `OrderPermissions`, `PasswordPolicy`, `TextNormalizer`, money), persistence mapper tests (no database),
+      `@WebMvcTest` slices, ArchUnit (written only by the task that names it).
+    - `src/integrationTest/java`: exactly three platform tests, written by the tasks that own them:
+      `ChangelogPortabilityTest`, `SeedConsistencyTest`, `OpenApiExportTest` with `OpenApiContractTest`. The database is
+      H2 in memory with the same init script as the application.
+    - Stage 2 (only after the human allows it): adapter, specification and constraint tests, endpoint and security tests
+      through the full context, concurrency and statement-count tests. A line of any rule's "Verification" that asks for
+      such a test is stage 2: skip it unless the task lists it.
+- **How (running):** While you work, run only the class you changed (`./gradlew test --tests '<Class>'`). Run the gate
+  once at the end as `./gradlew check -q --console=plain` and read only what fails.
 - **How (service unit tests):**
     - JUnit with `MockitoExtension` (strict stubs). Subject: `@InjectMocks private <Class> testObject`. Collaborators:
       `@Mock`. Captors: `@Captor`.
@@ -28,22 +36,19 @@ Unless explicitly overridden by the project specification:
     - Prefer an exact-argument stub of the port with the expected record over `@Captor` plus field asserts. Use
       `@Captor` when the object cannot be built up front.
     - Arrange, act and assert are separated by blank lines, without comments. One scenario per test.
-- **Naming:** `method_shouldResult_whenCondition`, for example `update_shouldThrowNotFound_whenPersonMissing`. Null
-  contract: `method_shouldThrowNpe_whenArgumentNull`. Data providers: `provide<What>`.
-- **Parameterization:**
-    - `@NullSource` for a null argument. With several parameters use a `@MethodSource` that nulls one parameter at a
-      time.
-    - `@MethodSource` or `@ValueSource` for variations, the provider right above the test.
-    - Use `@ParameterizedTest` only when there are two or more cases. The one exception is the null-contract test:
-      `@ParameterizedTest` with `@NullSource`, even for a single parameter.
+    - What a use case gets: the success path, each business failure branch (every exception it can throw) and each
+      rights branch (each role the rule names). A pass-through use case gets the success test only. No null-contract
+      tests (D-079).
+- **Naming:** `method_shouldResult_whenCondition`, for example `update_shouldThrowNotFound_whenPersonMissing`. Data
+  providers: `provide<What>`.
+- **Parameterization:** `@MethodSource` or `@ValueSource` for variations, the provider right above the test.
+  `@ParameterizedTest` only when there are two or more cases.
 - **Assertions:** JUnit `Assertions`, expected value first. Compare whole records instead of field by field.
   `assertSame` when the same instance must pass through. Keep the result of `assertThrows` and check the data: for
   `BusinessException` its `code`.
-- **Test data:**
-    - `private static final` constants at the top of the class, fixed literals (UUIDs through `UUID.fromString`, fixed
-      dates).
-    - Builder methods `buildX()` are `private static` at the bottom of the same class. No shared fixtures.
-    - Expected values are literals, never recomputed with production logic.
+- **Test data:** `private static final` constants at the top of the class, fixed literals (UUIDs through
+  `UUID.fromString`, fixed dates). Builder methods `buildX()` are `private static` at the bottom of the same class. No
+  shared fixtures. Expected values are literals, never recomputed with production logic.
 - **Real objects for values:** `Clock.fixed(instant, ZoneOffset.UTC)`, properties records, DTOs. When the subject needs
   them, create it in `@BeforeEach` through its constructor (`@InjectMocks` injects only mocks and passes `null` for the
   rest).
@@ -92,12 +97,6 @@ class PersonServiceImplTest {
         assertEquals("error.not-found", exception.code());
     }
 
-    @ParameterizedTest
-    @NullSource
-    void create_shouldThrowNpe_whenArgumentNull(CreatePersonDto dto) {
-        assertThrows(NullPointerException.class, () -> testObject.create(dto));
-    }
-
     // buildPerson(), buildCreatePersonDto(), buildUpdatePersonDto(): private static builders at the bottom
 }
 ```
@@ -105,14 +104,10 @@ class PersonServiceImplTest {
 ## Why
 
 - Strict stubs plus `verifyNoMoreInteractions` make every unexpected call fail, and a failing branch proves that nothing
-  after it ran (for example, nothing was saved).
-- `doReturn` everywhere gives one syntax for void and non-void methods and for spies. The price: the compiler does not
-  check the return type, so a mismatch fails at run time.
-- An exact-argument stub with an expected record checks that the service assembled the object correctly, in one line.
-- Fixed data makes failures reproducible. Real value objects remove `lenient()` stubs and hidden coupling to the
-  implementation.
-- Mocks cannot prove SQL, mappings, constraints, serialization or error responses, so those have their own test layers.
-- The null-contract tests are the only mechanical check that Lombok `@NonNull` is present on `*ServiceImpl` parameters.
+  after it ran.
+- Mocks cannot prove SQL, mappings, constraints, serialization or error responses: those belong to the platform tests
+  now and to stage 2 later.
+- Fixed data makes failures reproducible.
 
 ## Exceptions
 
@@ -127,36 +122,13 @@ acceptance tests for a use case; follow it.
 - `UUID.randomUUID()`, `LocalDate.now()`, `Instant.now()`, `ZoneId.systemDefault()` in tests.
 - `ReflectionTestUtils` on production fields: inject through the constructor or a properties record.
 - Logic (`if`, ternary, loops) in tests; expected values computed like production code.
-- `Thread.sleep`: use Awaitility.
+- `Thread.sleep`.
 - Redundant checks: `verify` of an already stubbed call, `times(1)`, `doNothing()` on a void method.
-- A `@ParameterizedTest` with one case, except the `@NullSource` null-contract test.
+- A `@ParameterizedTest` with one case.
+- Null-contract tests (`@NullSource` and the like).
+- Tests that insert rows by SQL to try a constraint.
 - Comparing two password hashes.
 - State shared between tests.
-
-```java
-when(personRepository.findById(ID)).
-
-thenReturn(Optional.of(person));   // use doReturn(...).when(...)
-
-lenient().
-
-doReturn(Optional.of(person)).
-
-when(personRepository).
-
-findById(ID);   // stub in the test that needs it
-
-@Mock
-private Clock clock;                                             // use Clock.fixed(...)
-
-doReturn(UUID.randomUUID()).
-
-when(idGenerator).
-
-generateId();            // use the fixed ID
-
-assertEquals(FIRST_NAME, saved.firstName());                           // compare the whole record
-```
 
 ## Special Cases
 
@@ -164,14 +136,12 @@ assertEquals(FIRST_NAME, saved.firstName());                           // compar
   `try/finally`, never without cleanup.
 - Password hashing: test that `matches` is true for the right password and false for a wrong one. Never assert a hash
   value (it is salted).
-- Async code: Awaitility with an explicit timeout.
 
 ## Infrastructure
 
 - Gradle test dependencies: `spring-boot-starter-test`; for Spring Boot 4 slices the modular starters
-  `spring-boot-starter-webmvc-test` and `spring-boot-starter-data-jpa-test`; `archunit-junit5`; Awaitility;
-  `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`. Testcontainers (PostgreSQL) is added only if
-  PostgreSQL becomes the database.
+  `spring-boot-starter-webmvc-test` and `spring-boot-starter-data-jpa-test`; `archunit-junit5`;
+  `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`.
 - Source set `integrationTest` extends the `test` dependencies; `check` depends on `integrationTest`.
 - AssertJ arrives with `spring-boot-starter-test` but is not used by convention: JUnit assertions only.
 - Formatting is enforced by Spotless, not by review.
@@ -179,7 +149,8 @@ assertEquals(FIRST_NAME, saved.firstName());                           // compar
 ## Verification
 
 - `./gradlew check` is the single gate: agents, hooks and the reviewer run it.
-- Reviewer checklist: every use case has the success path, every failure branch and the null contract; every adapter has
-  insert, update, find and each filter; every endpoint has the success path and the error mapping; no item from
-  Prohibitions.
-- ArchUnit: test classes mirror the package of the class under test and end with `Test`.
+- Reviewer checklist: every use case the task lists has its success path, its business failure branches and its rights
+  branches; every endpoint of a `@WebMvcTest` slice has the success path and the error mapping; no item from
+  Prohibitions; no test of stage 2 unless the task lists it.
+- ArchUnit (only in the task that names it): test classes mirror the package of the class under test and end with
+  `Test`.

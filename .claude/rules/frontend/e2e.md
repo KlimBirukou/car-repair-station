@@ -11,9 +11,10 @@ paths:
 Unless explicitly overridden by the project specification:
 
 - **What:** Playwright tests that run the real frontend against the real backend with the seed. They check the three
-  flows of the task, the layout on three screen sizes, and the 48 px touch targets. They are not part of the gate.
-- **When:** `npm run e2e` runs when a task covers a user flow or a screen of the key list; the reviewer opens the
-  screenshots. Every task also ends with a short note on what was checked in the UI.
+  flows of the task, the layout on three screen sizes, and the 48 px touch targets. They are not part of the gate. They
+  belong to stage 2 (D-077): no task of stage 1 writes or runs them.
+- **When:** `npm run e2e` runs only in the browser-flow tasks of stage 2, and the reviewer opens the screenshots. A task
+  of a screen never starts it. In stage 1 a task ends with a short note on what its component tests check in the UI.
 - **Where:** `frontend/e2e/` (`flows/*.spec.ts`, `layout/*.spec.ts`, `support/` with `login.ts`, `touchTargets.ts`,
   `screens.ts`), `frontend/playwright.config.ts`, screenshots in `frontend/e2e/screenshots/<project>/` (git-ignored).
 - **How (stack):** The tests need the development stack with the seed. `playwright.config.ts` has two `webServer`
